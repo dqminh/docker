@@ -41,9 +41,7 @@ func main() {
 	opts := &fuse.MountOptions{
 		Name: "vfuse_SOMECLIENT",
 	}
-	fs := &FS{
-		ln: ln,
-	}
+	fs := NewFS(ln)
 	rawFS := fuse.NewRawFileSystem(fs)
 	log.Printf("Mounting at %s", *mount)
 	srv, err := fuse.NewServer(rawFS, *mount, opts)
@@ -63,7 +61,16 @@ type FS struct {
 	c  net.Conn
 	vc *vfuse.Client
 
-	wmu sync.Mutex // mutex to hold while writing a packet
+	mu     sync.Mutex // guards writing to vc and following fields
+	nextid uint64
+	res    map[uint64]chan<- vfuse.Packet
+}
+
+func NewFS(ln net.Listener) *FS {
+	return &FS{
+		ln:  ln,
+		res: make(map[uint64]chan<- vfuse.Packet),
+	}
 }
 
 func (fs *FS) Init(s *fuse.Server) {
@@ -77,5 +84,26 @@ func (fs *FS) Init(s *fuse.Server) {
 	fs.ln.Close()
 	fs.c = c
 	fs.vc = vfuse.NewClient(c)
+	go fs.readFromClient()
 	log.Printf("Init got conn %v from %v", c, c.RemoteAddr())
+}
+
+func (fs *FS) readFromClient() {
+	for {
+		p, err := fs.vc.ReadPacket()
+		if err != nil {
+			log.Fatalf("Client disconnected or something: %v", err)
+		}
+		fs.mu.Lock()
+		id := p.Header().ID
+		resc, ok := fs.res[id]
+		if ok {
+			delete(fs.res, id)
+		}
+		fs.mu.Unlock()
+		if !ok {
+			log.Fatalf("Client sent bogus packet we didn't ask for")
+		}
+		resc <- p
+	}
 }
