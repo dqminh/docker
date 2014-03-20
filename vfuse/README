@@ -1,0 +1,3 @@
+This is a FUSE server for dockerd (Linux-only) that implements its
+filesystem by proxying all the FUSE filesystem operations to a docker
+client (Mac, Windows, Linux).
