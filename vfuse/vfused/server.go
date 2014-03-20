@@ -7,7 +7,9 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"sync"
 
+	"github.com/dotcloud/docker/vfuse"
 	"github.com/hanwen/go-fuse/fuse"
 )
 
@@ -59,6 +61,9 @@ func main() {
 type FS struct {
 	ln net.Listener
 	c  net.Conn
+	vc *vfuse.Client
+
+	wmu sync.Mutex // mutex to hold while writing a packet
 }
 
 func (fs *FS) Init(s *fuse.Server) {
@@ -71,5 +76,6 @@ func (fs *FS) Init(s *fuse.Server) {
 	}
 	fs.ln.Close()
 	fs.c = c
+	fs.vc = vfuse.NewClient(c)
 	log.Printf("Init got conn %v from %v", c, c.RemoteAddr())
 }
