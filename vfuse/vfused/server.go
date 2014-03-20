@@ -49,8 +49,24 @@ func main() {
 		log.Fatalf("NewServer: %v", err)
 	}
 	go srv.Serve()
-	log.Printf("Waiting for key to exit.")
-	os.Stdin.Read(make([]byte, 1))
+
+	go func() {
+		c, err := net.Dial("tcp", *listenAddr)
+		if err != nil {
+			log.Printf("Client dial fail: %v", err)
+			return
+		}
+		c.Close()
+	}()
+
+	log.Printf("Press 'q'+<enter> to exit.")
+	var buf [1]byte
+	for {
+		_, err := os.Stdin.Read(buf[:])
+		if err != nil || buf[0] == 'q' {
+			break
+		}
+	}
 	log.Printf("Got key, unmounting.")
 	srv.Unmount()
 	log.Printf("Unmounted, quitting.")
@@ -86,6 +102,19 @@ func (fs *FS) Init(s *fuse.Server) {
 	fs.vc = vfuse.NewClient(c)
 	go fs.readFromClient()
 	log.Printf("Init got conn %v from %v", c, c.RemoteAddr())
+}
+
+func (fs *FS) StatFs(in *fuse.InHeader, out *fuse.StatfsOut) (code fuse.Status) {
+	log.Printf("fs.StatFs")
+	// TODO(bradfitz): make up some stuff for now. Do this properly later
+	// with a new packet type to the client.
+	out.Bsize = 1024
+	out.Blocks = 1e6
+	out.Bfree = out.Blocks / 2
+	out.Bavail = out.Blocks / 2
+	out.Files = 1e3
+	out.Ffree = 1e3 - 2
+	return 0
 }
 
 func (fs *FS) readFromClient() {
