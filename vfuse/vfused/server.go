@@ -163,7 +163,7 @@ func (fs *FS) GetAttr(name string, context *fuse.Context) (*fuse.Attr, fuse.Stat
 
 	fs.mu.Lock()
 	id, resc := fs.nextID()
-	p := vfuse.AttrReqPacket{ID: id, Name: name}
+	p := vfuse.NewAttrReqPacket(id, name)
 	err := fs.vc.WritePacket(p)
 	fs.mu.Unlock()
 

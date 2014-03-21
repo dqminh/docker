@@ -4,18 +4,33 @@ import (
 	"bufio"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 )
 
+type PacketType uint32
+
 const (
-	AttrReqType = 0
-	AttrResType = 1
+	AttrReqType PacketType = 0
+	AttrResType PacketType = 1
 )
+
+// Registry of packet parsing functions. The body
+var parsers = map[PacketType]func(h Header, body []byte) (Packet, error){
+	AttrReqType: parseAddrReqPacket,
+}
+
+func parseAddrReqPacket(h Header, body []byte) (Packet, error) {
+	return AttrReqPacket{
+		Hdr:  h,
+		Name: string(body),
+	}, nil
+}
 
 type Header struct {
 	ID     uint64
-	Type   uint32
+	Type   PacketType
 	Length uint32
 }
 
@@ -25,16 +40,7 @@ type Packet interface {
 }
 
 type OpenPacket struct {
-	rawPacket
 }
-
-type rawPacket struct {
-	h Header
-	b []byte
-}
-
-func (rp rawPacket) Header() Header  { return rp.h }
-func (rp rawPacket) RawBody() []byte { return rp.b }
 
 type Client struct {
 	buf  *bufio.ReadWriter
@@ -62,7 +68,7 @@ func (c *Client) ReadPacket() (Packet, error) {
 
 	h := Header{
 		ID:     binary.BigEndian.Uint64(hbuf[:8]),
-		Type:   binary.BigEndian.Uint32(hbuf[8:12]),
+		Type:   PacketType(binary.BigEndian.Uint32(hbuf[8:12])),
 		Length: binary.BigEndian.Uint32(hbuf[12:]),
 	}
 
@@ -72,8 +78,14 @@ func (c *Client) ReadPacket() (Packet, error) {
 
 	body := make([]byte, h.Length)
 	_, err = io.ReadFull(c.buf, body)
-
-	return rawPacket{h, body}, err
+	if err != nil {
+		return nil, err
+	}
+	ctor, ok := parsers[h.Type]
+	if !ok {
+		return nil, fmt.Errorf("Unknown packet type %d received", h.Type)
+	}
+	return ctor(h, body)
 }
 
 func (c *Client) WritePacket(p Packet) error {
@@ -85,7 +97,7 @@ func (c *Client) WritePacket(p Packet) error {
 	}
 
 	binary.BigEndian.PutUint64(hbuf[:8], h.ID)
-	binary.BigEndian.PutUint32(hbuf[8:12], h.Type)
+	binary.BigEndian.PutUint32(hbuf[8:12], uint32(h.Type))
 	binary.BigEndian.PutUint32(hbuf[12:], h.Length)
 
 	if _, err := c.buf.Write(hbuf[:]); err != nil {
@@ -99,23 +111,28 @@ func (c *Client) WritePacket(p Packet) error {
 }
 
 type AttrResPacket struct {
-	rawPacket
-	ID uint64
+	Hdr  Header
 	Name string
 }
 
 type AttrReqPacket struct {
-	rawPacket
-	ID uint64
+	Hdr  Header
 	Name string
 }
 
-func (p AttrReqPacket) Header() Header {
-	return Header{
-		ID: p.ID,
-		Type: AttrReqType,
-		Length: uint32(len(p.Name)),
+func NewAttrReqPacket(id uint64, name string) AttrReqPacket {
+	return AttrReqPacket{
+		Header{
+			ID:     id,
+			Type:   AttrReqType,
+			Length: uint32(len(name)),
+		},
+		name,
 	}
+}
+
+func (p AttrReqPacket) Header() Header {
+	return p.Hdr
 }
 
 func (p AttrReqPacket) RawBody() []byte {
