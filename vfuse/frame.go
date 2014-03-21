@@ -112,7 +112,36 @@ func (c *Client) WritePacket(p Packet) error {
 
 type AttrResPacket struct {
 	Hdr  Header
-	Name string
+	Attr Attr
+}
+
+type Attr struct {
+	Size uint64
+	Atime uint64
+	Mtime uint64
+	Atimensec uint32
+	Mtimensec uint32
+	Mode uint32
+	Nlink uint32
+}
+
+func NewAttrResPacket(id uint64, name string) AttrResPacket {
+	return AttrResPacket{
+		Header{
+			ID:     id,
+			Type:   AttrResType,
+			Length: uint32(len(Attr)),
+		},
+		name,
+	}
+}
+
+func (p AttrResPacket) Header() Header {
+	return p.Hdr
+}
+
+func (p AttrResPacket) RawBody() []byte {
+	return []byte(p.Name)
 }
 
 type AttrReqPacket struct {
