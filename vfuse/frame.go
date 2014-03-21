@@ -18,14 +18,39 @@ const (
 
 // Registry of packet parsing functions. The body
 var parsers = map[PacketType]func(h Header, body []byte) (Packet, error){
-	AttrReqType: parseAddrReqPacket,
+	AttrReqType: parseAttrReqPacket,
+	AttrResType: parseAttrResPacket,
 }
 
-func parseAddrReqPacket(h Header, body []byte) (Packet, error) {
+func parseAttrReqPacket(h Header, body []byte) (Packet, error) {
 	return AttrReqPacket{
 		Hdr:  h,
 		Name: string(body),
 	}, nil
+}
+
+func parseAttrResPacket(h Header, body []byte) (Packet, error) {
+	if len(body) != AttrResLength {
+		return nil, errors.New("unexpected attr res length")
+	}
+	p := AttrResPacket{Hdr: h}
+	p.Attr.Size, body = eatu64(body)
+	p.Attr.Atime, body = eatu64(body)
+	p.Attr.Mtime, body = eatu64(body)
+	p.Attr.Atimensec, body = eatu32(body)
+	p.Attr.Mtimensec, body = eatu32(body)
+	p.Attr.Mode, body = eatu32(body)
+	p.Attr.Nlink, body = eatu32(body)
+	return p, nil
+
+}
+
+func eatu64(b []byte) (uint64, []byte) {
+	return binary.BigEndian.Uint64(b[:8]), b[8:]
+}
+
+func eatu32(b []byte) (uint32, []byte) {
+	return binary.BigEndian.Uint32(b[:4]), b[4:]
 }
 
 type Header struct {
@@ -116,23 +141,25 @@ type AttrResPacket struct {
 }
 
 type Attr struct {
-	Size uint64
-	Atime uint64
-	Mtime uint64
+	Size      uint64
+	Atime     uint64
+	Mtime     uint64
 	Atimensec uint32
 	Mtimensec uint32
-	Mode uint32
-	Nlink uint32
+	Mode      uint32
+	Nlink     uint32
 }
 
-func NewAttrResPacket(id uint64, name string) AttrResPacket {
+const AttrResLength = 8*3 + 4*4
+
+func NewAttrResPacket(id uint64, a Attr) AttrResPacket {
 	return AttrResPacket{
-		Header{
+		Hdr: Header{
 			ID:     id,
 			Type:   AttrResType,
-			Length: uint32(len(Attr)),
+			Length: uint32(AttrResLength),
 		},
-		name,
+		Attr: a,
 	}
 }
 
@@ -141,7 +168,25 @@ func (p AttrResPacket) Header() Header {
 }
 
 func (p AttrResPacket) RawBody() []byte {
-	return []byte(p.Name)
+	buf := make([]byte, 0, p.Hdr.Length)
+	buf = appendu64(buf, p.Attr.Size)
+	buf = appendu64(buf, p.Attr.Atime)
+	buf = appendu64(buf, p.Attr.Mtime)
+	buf = appendu32(buf, p.Attr.Atimensec)
+	buf = appendu32(buf, p.Attr.Mtimensec)
+	buf = appendu32(buf, p.Attr.Mode)
+	buf = appendu32(buf, p.Attr.Nlink)
+	return buf
+}
+
+func appendu64(src []byte, v uint64) []byte {
+	binary.BigEndian.PutUint64(src[len(src):len(src)+8], v)
+	return src[:len(src)+8]
+}
+
+func appendu32(src []byte, v uint32) []byte {
+	binary.BigEndian.PutUint32(src[len(src):len(src)+4], v)
+	return src[:len(src)+4]
 }
 
 type AttrReqPacket struct {
