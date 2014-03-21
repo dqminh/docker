@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	ReadFile = 0
-	ReadDir  = 1
+	AttrReqType = 0
+	AttrResType = 1
 )
 
 type Header struct {
@@ -22,6 +22,10 @@ type Header struct {
 type Packet interface {
 	Header() Header
 	RawBody() []byte
+}
+
+type OpenPacket struct {
+	rawPacket
 }
 
 type rawPacket struct {
@@ -92,4 +96,28 @@ func (c *Client) WritePacket(p Packet) error {
 	}
 
 	return c.buf.Flush()
+}
+
+type AttrResPacket struct {
+	rawPacket
+	ID uint64
+	Name string
+}
+
+type AttrReqPacket struct {
+	rawPacket
+	ID uint64
+	Name string
+}
+
+func (p AttrReqPacket) Header() Header {
+	return Header{
+		ID: p.ID,
+		Type: AttrReqType,
+		Length: uint32(len(p.Name)),
+	}
+}
+
+func (p AttrReqPacket) RawBody() []byte {
+	return []byte(p.Name)
 }
