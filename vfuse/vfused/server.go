@@ -20,6 +20,7 @@ import (
 var (
 	listenAddr = flag.String("listen", "7070", "Listen port or 'ip:port'.")
 	mount      = flag.String("mount", "", "Mount point. If empty, a temp directory is used.")
+	self       = flag.Bool("self", false, "connect to self")
 )
 
 func main() {
@@ -42,22 +43,23 @@ func main() {
 	if err != nil {
 		log.Fatalf("Listen: %v", err)
 	}
-
-	go func() {
-		to := *listenAddr
-		if strings.HasPrefix(to, ":") {
-			to = "localhost" + to
-		}
-		log.Printf("Dialing %q ...", to)
-		c, err := net.Dial("tcp", to)
-		log.Printf("Client dial = %v, %v", c, err)
-		if err != nil {
-			log.Printf("Client dial fail: %v", err)
-			return
-		}
-		time.Sleep(60 * time.Minute)
-		c.Close()
-	}()
+	if *self {
+		go func() {
+			to := *listenAddr
+			if strings.HasPrefix(to, ":") {
+				to = "localhost" + to
+			}
+			log.Printf("Dialing %q ...", to)
+			c, err := net.Dial("tcp", to)
+			log.Printf("Client dial = %v, %v", c, err)
+			if err != nil {
+				log.Printf("Client dial fail: %v", err)
+				return
+			}
+			time.Sleep(60 * time.Minute)
+			c.Close()
+		}()
+	}
 
 	opts := &fuse.MountOptions{
 		Name: "vfuse_SOMECLIENT",
