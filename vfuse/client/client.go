@@ -1,14 +1,15 @@
-// A Go mirror of libfuse's hello.c
+// The client binary owns the filesystem and runs on the host machine
+// (which may be Mac, Windows, Linux, etc) and responds to the dockerd
+// server (which is running FUSE, and always Linux).
 package main
 
 import (
 	"flag"
-	"path/filepath"
 	"log"
-	"fmt"
-	"sync"
-	"os"
 	"net"
+	"os"
+	"path/filepath"
+	"sync"
 
 	"github.com/dotcloud/docker/vfuse"
 )
@@ -16,13 +17,13 @@ import (
 type Volume struct {
 	Root string
 
-	mu sync.Mutex
+	mu    sync.Mutex
 	files map[uint64]*os.File
 }
 
 func NewVolume(root string) *Volume {
 	return &Volume{
-		Root: root,
+		Root:  root,
 		files: make(map[uint64]*os.File),
 	}
 
@@ -42,7 +43,6 @@ func main() {
 
 	c := vfuse.NewClient(conn)
 
-
 	for {
 		pkti, err := c.ReadPacket()
 		if err != nil {
@@ -54,7 +54,8 @@ func main() {
 		switch pkt := pkti.(type) {
 		case vfuse.AttrReqPacket:
 			fi, _ := os.Lstat(filepath.Join(v.Root, filepath.FromSlash(pkt.Name)))
-			c.WritePacket(Packet{
+			_ = fi
+			panic("TODO")
 		}
 
 	}
