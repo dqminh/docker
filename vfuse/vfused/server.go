@@ -7,9 +7,7 @@ import (
 	"net"
 	"os"
 	"strconv"
-	"strings"
 	"sync"
-	"time"
 
 	"github.com/dotcloud/docker/vfuse/pb"
 
@@ -23,8 +21,15 @@ import (
 var (
 	listenAddr = flag.String("listen", "7070", "Listen port or 'ip:port'.")
 	mount      = flag.String("mount", "", "Mount point. If empty, a temp directory is used.")
-	self       = flag.Bool("self", false, "connect to self")
+	verbose    = flag.Bool("verbose", false, "verbose debugging mode")
 )
+
+func vlogf(format string, args ...interface{}) {
+	if !*verbose {
+		return
+	}
+	log.Printf("server: "+format, args...)
+}
 
 func main() {
 	flag.Parse()
@@ -45,23 +50,6 @@ func main() {
 	ln, err := net.Listen("tcp", *listenAddr)
 	if err != nil {
 		log.Fatalf("Listen: %v", err)
-	}
-	if *self {
-		go func() {
-			to := *listenAddr
-			if strings.HasPrefix(to, ":") {
-				to = "localhost" + to
-			}
-			log.Printf("Dialing %q ...", to)
-			c, err := net.Dial("tcp", to)
-			log.Printf("Client dial = %v, %v", c, err)
-			if err != nil {
-				log.Printf("Client dial fail: %v", err)
-				return
-			}
-			time.Sleep(60 * time.Minute)
-			c.Close()
-		}()
 	}
 
 	opts := &fuse.MountOptions{
@@ -108,7 +96,7 @@ type FS struct {
 }
 
 func (fs *FS) getClient() {
-	log.Printf("getClient")
+	vlogf("server: getClient")
 	c, err := fs.ln.Accept()
 	if err != nil {
 		log.Fatalf("Error accepting conn: %v", err)
@@ -118,14 +106,14 @@ func (fs *FS) getClient() {
 	fs.c = c
 	fs.vc = vfuse.NewClient(c)
 	go fs.readFromClient()
-	log.Printf("Init got conn %v from %v", c, c.RemoteAddr())
+	vlogf("server: init got client %v from %v", c, c.RemoteAddr())
 }
 
 func (fs *FS) sendPacket(body proto.Message) (<-chan proto.Message, error) {
 	fs.clientOnce.Do(fs.getClient)
 	id, resc := fs.nextID()
 	if err := fs.vc.WritePacket(vfuse.Packet{
-		Header:   vfuse.Header{
+		Header: vfuse.Header{
 			ID: id,
 		},
 		Body: body,
@@ -154,7 +142,7 @@ func NewFS(ln net.Listener) *FS {
 }
 
 func (fs *FS) StatFs(name string) *fuse.StatfsOut {
-	log.Printf("fs.StatFs(%q)", name)
+	vlogf("fs.StatFs(%q)", name)
 	out := new(fuse.StatfsOut)
 	// TODO(bradfitz): make up some stuff for now. Do this properly later
 	// with a new packet type to the client.
@@ -168,17 +156,17 @@ func (fs *FS) StatFs(name string) *fuse.StatfsOut {
 }
 
 func (fs *FS) Open(name string, flags uint32, context *fuse.Context) (file nodefs.File, code fuse.Status) {
-	log.Printf("fs.Open(%q, flags %d)", name, flags)
+	vlogf("fs.Open(%q, flags %d)", name, flags)
 	return nil, fuse.ENOSYS
 }
 
 func (fs *FS) OpenDir(name string, context *fuse.Context) (stream []fuse.DirEntry, code fuse.Status) {
-	log.Printf("OpenDir(%q)", name)
+	vlogf("OpenDir(%q)", name)
 	return nil, fuse.OK
 }
 
 func (fs *FS) GetAttr(name string, context *fuse.Context) (*fuse.Attr, fuse.Status) {
-	log.Printf("fs.GetAttr(%q)", name)
+	vlogf("fs.GetAttr(%q)", name)
 
 	resc, err := fs.sendPacket(&pb.AttrRequest{
 		Name: &name,
@@ -187,13 +175,33 @@ func (fs *FS) GetAttr(name string, context *fuse.Context) (*fuse.Attr, fuse.Stat
 		return nil, fuse.EIO
 	}
 	resi := <-resc
+	vlogf("fs.GetAttr(%q) read response %T, %v", name, resi, resi)
 	res, ok := resi.(*pb.AttrResponse)
 	if !ok {
+		vlogf("fs.GetAttr(%q) = EIO because wrong type", name)
 		return nil, fuse.EIO
 	}
-	_ = res
-
-	return nil, fuse.ENOENT
+	if res.Err != nil {
+		if res.Err.GetNotExist() {
+			return nil, fuse.ENOENT
+		}
+		vlogf("fs.GetAttr(%q) = EIO because some Err", name)
+		return nil, fuse.EIO
+	}
+	attr := res.Attr
+	if attr == nil {
+		vlogf("fs.GetAttr(%q) = EIO because nil Attr", name)
+		return nil, fuse.EIO
+	}
+	fattr := &fuse.Attr{
+		Size:    attr.GetSize(),
+		Mode:    attr.GetMode(),
+		Nlink:   1,
+		Blksize: 1024,
+		Blocks:  attr.GetSize() / 1024,
+	}
+	vlogf("fs.GetAttr(%q) = OK: %+v", name, fattr)
+	return fattr, fuse.OK
 }
 
 //SetAttr(input *SetAttrIn, out *AttrOut) (code Status)
@@ -202,7 +210,7 @@ func (fs *FS) readFromClient() {
 	for {
 		p, err := fs.vc.ReadPacket()
 		if err != nil {
-			log.Fatalf("Client disconnected or something: %v", err)
+			log.Fatalf("server: client disconnected or something: %v", err)
 		}
 		id := p.Header.ID
 		fs.mu.Lock()

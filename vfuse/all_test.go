@@ -1,8 +1,12 @@
+// Integration tests for vfuse client & server.
+
 package vfuse
 
 import (
 	"bytes"
+	"flag"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,6 +16,9 @@ import (
 	"time"
 )
 
+var verbose = flag.Bool("verbose", false, "verbose")
+
+// TODO: break this into multiple tests with common setup/teardown code.
 func TestAll(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("test only runs on linux")
@@ -41,7 +48,11 @@ func TestAll(t *testing.T) {
 	}
 
 	port := 7070
-	serverCmd := exec.Command(vfused, "--mount="+mountDir, "--listen="+strconv.Itoa(port))
+	serverCmd := exec.Command(vfused,
+		"--mount="+mountDir,
+		"--listen="+strconv.Itoa(port),
+		"--verbose="+strconv.FormatBool(*verbose),
+	)
 	serverCmd.Stdout = os.Stdout
 	serverCmd.Stderr = os.Stderr
 	sin, err := serverCmd.StdinPipe()
@@ -61,7 +72,10 @@ func TestAll(t *testing.T) {
 		t.Fatal("never saw %s get mounted", mountDir)
 	}
 
-	clientCmd := exec.Command(vclient, "--addr=localhost:"+strconv.Itoa(port))
+	clientCmd := exec.Command(vclient,
+		"--addr=localhost:"+strconv.Itoa(port),
+		"--verbose="+strconv.FormatBool(*verbose),
+	)
 	clientCmd.Stdout = os.Stdout
 	clientCmd.Stderr = os.Stderr
 	clientCmd.Dir = clientDir
@@ -70,8 +84,20 @@ func TestAll(t *testing.T) {
 	}
 	defer clientCmd.Process.Kill()
 
-	fi, err := os.Lstat(filepath.Join(mountDir, "File.txt"))
+	// Stat a regular file.
+	path := filepath.Join(mountDir, "File.txt")
+	if false {
+		straceCmd := exec.Command("strace", "-f", "stat", path)
+		straceCmd.Stdout = os.Stdout
+		straceCmd.Stderr = os.Stderr
+		straceCmd.Run()
+	}
+
+	fi, err := os.Lstat(path)
 	if err != nil {
+		log.Printf("FAIL; sleeping. Mountdir: %v", mountDir)
+		time.Sleep(30 * time.Minute)
+
 		t.Fatalf("File.txt Lstat = %v; want valid file", err)
 	}
 	if fi.Size() != int64(len(fileContents)) {
@@ -79,6 +105,11 @@ func TestAll(t *testing.T) {
 	}
 	if !fi.Mode().IsRegular() {
 		t.Errorf("File.txt isn't regular")
+	}
+
+	// Stat a non-existant file.
+	if _, err := os.Lstat(filepath.Join(mountDir, "File-noent.txt")); !os.IsNotExist(err) {
+		t.Errorf("For non-existant file, want os.IsNotExist; got err = %v", err)
 	}
 
 	sin.Write([]byte("q\n")) // tell FUSE server to close nicely
