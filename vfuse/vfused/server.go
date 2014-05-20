@@ -11,6 +11,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dotcloud/docker/vfuse/pb"
+
+	"code.google.com/p/goprotobuf/proto"
 	"github.com/dotcloud/docker/vfuse"
 	"github.com/hanwen/go-fuse/fuse"
 	"github.com/hanwen/go-fuse/fuse/nodefs"
@@ -99,9 +102,9 @@ type FS struct {
 
 	clientOnce sync.Once
 
-	mu     sync.Mutex // guards writing to vc and following fields
+	mu     sync.Mutex // guards the following fields
 	nextid uint64
-	res    map[uint64]chan<- vfuse.Packet
+	res    map[uint64]chan<- proto.Message
 }
 
 func (fs *FS) getClient() {
@@ -118,9 +121,24 @@ func (fs *FS) getClient() {
 	log.Printf("Init got conn %v from %v", c, c.RemoteAddr())
 }
 
-// fs.mu must be held.
-func (fs *FS) nextID() (uint64, <-chan vfuse.Packet) {
-	c := make(chan vfuse.Packet, 1)
+func (fs *FS) sendPacket(body proto.Message) (<-chan proto.Message, error) {
+	fs.clientOnce.Do(fs.getClient)
+	id, resc := fs.nextID()
+	if err := fs.vc.WritePacket(vfuse.Packet{
+		Header:   vfuse.Header{
+			ID: id,
+		},
+		Body: body,
+	}); err != nil {
+		return nil, err
+	}
+	return resc, nil
+}
+
+func (fs *FS) nextID() (uint64, <-chan proto.Message) {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+	c := make(chan proto.Message, 1)
 	id := fs.nextid
 	fs.nextid++
 	fs.res[id] = c
@@ -131,7 +149,7 @@ func NewFS(ln net.Listener) *FS {
 	return &FS{
 		FileSystem: pathfs.NewDefaultFileSystem(),
 		ln:         ln,
-		res:        make(map[uint64]chan<- vfuse.Packet),
+		res:        make(map[uint64]chan<- proto.Message),
 	}
 }
 
@@ -161,23 +179,18 @@ func (fs *FS) OpenDir(name string, context *fuse.Context) (stream []fuse.DirEntr
 
 func (fs *FS) GetAttr(name string, context *fuse.Context) (*fuse.Attr, fuse.Status) {
 	log.Printf("fs.GetAttr(%q)", name)
-	fs.clientOnce.Do(fs.getClient)
 
-	fs.mu.Lock()
-	id, resc := fs.nextID()
-	p := vfuse.NewAttrReqPacket(id, name)
-	err := fs.vc.WritePacket(p)
-	fs.mu.Unlock()
-
+	resc, err := fs.sendPacket(&pb.AttrRequest{
+		Name: &name,
+	})
 	if err != nil {
 		return nil, fuse.EIO
 	}
-	res := <-resc
-	/*attrResPkt, ok := res.(*fuse.AttrResPacket)
+	resi := <-resc
+	res, ok := resi.(*pb.AttrResponse)
 	if !ok {
 		return nil, fuse.EIO
 	}
-	*/
 	_ = res
 
 	return nil, fuse.ENOENT
@@ -191,16 +204,26 @@ func (fs *FS) readFromClient() {
 		if err != nil {
 			log.Fatalf("Client disconnected or something: %v", err)
 		}
+		id := p.Header.ID
 		fs.mu.Lock()
-		id := p.Header().ID
 		resc, ok := fs.res[id]
 		if ok {
-			delete(fs.res, id)
+			fs.forgetRequestLocked(id)
 		}
 		fs.mu.Unlock()
 		if !ok {
 			log.Fatalf("Client sent bogus packet we didn't ask for")
 		}
-		resc <- p
+		resc <- p.Body
 	}
+}
+
+func (fs *FS) forgetRequest(id uint64) {
+	fs.mu.Lock()
+	fs.forgetRequestLocked(id)
+	fs.mu.Unlock()
+}
+
+func (fs *FS) forgetRequestLocked(id uint64) {
+	delete(fs.res, id)
 }

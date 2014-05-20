@@ -12,6 +12,9 @@ import (
 	"sync"
 
 	"github.com/dotcloud/docker/vfuse"
+	"github.com/dotcloud/docker/vfuse/pb"
+
+	"code.google.com/p/goprotobuf/proto"
 )
 
 type Volume struct {
@@ -31,6 +34,8 @@ func NewVolume(root string) *Volume {
 
 var addr = flag.String("addr", "localhost:4321", "dockerfs service address")
 
+var _ = proto.String
+
 func main() {
 	flag.Parse()
 
@@ -44,19 +49,34 @@ func main() {
 	c := vfuse.NewClient(conn)
 
 	for {
-		pkti, err := c.ReadPacket()
+		p, err := c.ReadPacket()
 		if err != nil {
-			log.Fatal("ReadPacket error: %v", err)
+			log.Fatal("client: ReadPacket error: %v", err)
 		}
 
-		log.Printf("Got packet %T %+v %q", pkti, pkti.Header(), pkti.RawBody())
+		log.Printf("client: got packet %+v %T", p.Header, p.Body)
 
-		switch pkt := pkti.(type) {
-		case vfuse.AttrReqPacket:
-			fi, _ := os.Lstat(filepath.Join(v.Root, filepath.FromSlash(pkt.Name)))
-			_ = fi
-			panic("TODO")
+		switch m := p.Body.(type) {
+		case *pb.AttrRequest:
+			fi, err := os.Lstat(filepath.Join(v.Root, filepath.FromSlash(m.GetName())))
+			res := new(pb.AttrResponse)
+			if err != nil {
+				if os.IsNotExist(err) {
+					res.Err = &pb.Error{NotExist: proto.Bool(true)}
+				} else {
+					// TODO: more specific types
+					res.Err = &pb.Error{Other: proto.String(err.Error())}
+				}
+			} else {
+				res.Attr = &pb.Attr{
+					Size: proto.Uint64(uint64(fi.Size())),
+					// TODO: more
+				}
+			}
+			err = c.WriteReply(p.ID, res)
+			if err != nil {
+				log.Fatal(err)
+			}
 		}
-
 	}
 }

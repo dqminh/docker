@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -39,7 +40,8 @@ func TestAll(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	serverCmd := exec.Command(vfused, "--mount="+mountDir)
+	port := 7070
+	serverCmd := exec.Command(vfused, "--mount="+mountDir, "--listen="+strconv.Itoa(port))
 	serverCmd.Stdout = os.Stdout
 	serverCmd.Stderr = os.Stderr
 	sin, err := serverCmd.StdinPipe()
@@ -59,7 +61,27 @@ func TestAll(t *testing.T) {
 		t.Fatal("never saw %s get mounted", mountDir)
 	}
 
-	sin.Write([]byte("q\n"))
+	clientCmd := exec.Command(vclient, "--addr=localhost:"+strconv.Itoa(port))
+	clientCmd.Stdout = os.Stdout
+	clientCmd.Stderr = os.Stderr
+	clientCmd.Dir = clientDir
+	if err := clientCmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer clientCmd.Process.Kill()
+
+	fi, err := os.Lstat(filepath.Join(mountDir, "File.txt"))
+	if err != nil {
+		t.Fatalf("File.txt Lstat = %v; want valid file", err)
+	}
+	if fi.Size() != int64(len(fileContents)) {
+		t.Errorf("File.txt stat size = %d; want %d", fi.Size(), len(fileContents))
+	}
+	if !fi.Mode().IsRegular() {
+		t.Errorf("File.txt isn't regular")
+	}
+
+	sin.Write([]byte("q\n")) // tell FUSE server to close nicely
 	serverCmd.Wait()
 }
 
