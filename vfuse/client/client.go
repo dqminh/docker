@@ -81,7 +81,7 @@ func (s *Server) Run() {
 		p, err := s.c.ReadPacket()
 		vlogf("client: read packet %v, %v", p, err)
 		if err != nil {
-			log.Fatal("client: ReadPacket error: %v", err)
+			log.Fatalf("client: ReadPacket error: %v", err)
 		}
 
 		vlogf("client: got packet %+v %T", p.Header, p.Body)

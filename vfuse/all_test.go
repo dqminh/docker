@@ -5,11 +5,12 @@ package vfuse
 import (
 	"bytes"
 	"flag"
+	"io"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"testing"
@@ -18,102 +19,213 @@ import (
 
 var verbose = flag.Bool("verbose", false, "verbose")
 
-// TODO: break this into multiple tests with common setup/teardown code.
-func TestAll(t *testing.T) {
+// This is the list of tests that call getWorld. It's used so we know
+// how many tests will ultimately be run and when to do a best-effort
+// cleanup on the release of a world, to remove temp files and such.
+//
+// TODO(bradfitz): consider generating this list automatically by
+// using runtime.Stack and finding the goroutine in testing.Main and
+// finding the argument with the slice of InternalTest and using some
+// strconv and unsafe. That would be gross and awesome.
+
+var worldlyTests = []string{
+	"TestStatRegular",
+	"TestStatNoExist",
+}
+
+func getWorld(t *testing.T) *world {
 	if runtime.GOOS != "linux" {
 		t.Skip("test only runs on linux")
 	}
-	binDir := tempDir(t, "bin")
-	defer os.RemoveAll(binDir)
-	mountDir := tempDir(t, "mount")
-	defer os.RemoveAll(mountDir)
-	clientDir := tempDir(t, "client")
-	defer os.RemoveAll(clientDir)
-	defer exec.Command("fusermount", "-u", mountDir).Run()
+	currentTest = t
+	if w := singleWorld; w != nil {
+		w.t = t
+		return w
+	}
+	testsToRun = countTestsToRun()
+	singleWorld = newWorld(t)
+	singleWorld.t = t
+	return singleWorld
+}
 
-	vfused := filepath.Join(binDir, "vfused")
+func countTestsToRun() int {
+	f := flag.Lookup("test.run")
+	if f == nil || f.Value.String() == "" {
+		return len(worldlyTests)
+	}
+	rx, err := regexp.Compile(f.Value.String())
+	if err != nil {
+		// Shouldn't get this far anyway.
+		return len(worldlyTests)
+	}
+	n := 0
+	for _, name := range worldlyTests {
+		if rx.MatchString(name) {
+			n++
+		}
+	}
+	return n
+}
+
+var (
+	testsToRun  int
+	worldsEnded int
+
+	currentTest *testing.T
+	singleWorld *world
+)
+
+type world struct {
+	t *testing.T // changed per test. rest is static.
+
+	port      int
+	binDir    string
+	mountDir  string
+	clientDir string
+
+	server      *exec.Cmd
+	serverStdin io.WriteCloser
+
+	client *exec.Cmd
+}
+
+func newWorld(t *testing.T) *world {
+	w := &world{
+		binDir:    tempDir(t, "bin"),
+		mountDir:  tempDir(t, "mount"),
+		clientDir: tempDir(t, "client"),
+		port:      7070, // TODO: auto-pick a free one
+	}
+
+	vfused := filepath.Join(w.binDir, "vfused")
 	out, err := exec.Command("go", "build", "-o", vfused, "github.com/dotcloud/docker/vfuse/vfused").CombinedOutput()
 	if err != nil {
 		t.Fatalf("vfused build failure: %v, %s", err, out)
 	}
-	vclient := filepath.Join(binDir, "vclient")
+	vclient := filepath.Join(w.binDir, "vclient")
 	out, err = exec.Command("go", "build", "-o", vclient, "github.com/dotcloud/docker/vfuse/client").CombinedOutput()
 	if err != nil {
 		t.Fatalf("client build failure: %v, %s", err, out)
 	}
 
-	const fileContents = "Some file contents.\n"
-	if err := ioutil.WriteFile(filepath.Join(clientDir, "File.txt"), []byte(fileContents), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	port := 7070
-	serverCmd := exec.Command(vfused,
-		"--mount="+mountDir,
-		"--listen="+strconv.Itoa(port),
+	w.server = exec.Command(vfused,
+		"--mount="+w.mountDir,
+		"--listen="+strconv.Itoa(w.port),
 		"--verbose="+strconv.FormatBool(*verbose),
 	)
-	serverCmd.Stdout = os.Stdout
-	serverCmd.Stderr = os.Stderr
-	sin, err := serverCmd.StdinPipe()
+	w.server.Stdout = os.Stdout
+	w.server.Stderr = os.Stderr
+	sin, err := w.server.StdinPipe()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := serverCmd.Start(); err != nil {
+	w.serverStdin = sin
+	if err := w.server.Start(); err != nil {
 		t.Fatal(err)
 	}
 	for i := 0; i < 300; i++ {
-		if isMounted(mountDir) {
+		if isMounted(w.mountDir) {
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	if !isMounted(mountDir) {
-		t.Fatal("never saw %s get mounted", mountDir)
+	if !isMounted(w.mountDir) {
+		t.Fatal("never saw %s get mounted", w.mountDir)
 	}
 
-	clientCmd := exec.Command(vclient,
-		"--addr=localhost:"+strconv.Itoa(port),
+	w.client = exec.Command(vclient,
+		"--addr=localhost:"+strconv.Itoa(w.port),
 		"--verbose="+strconv.FormatBool(*verbose),
 	)
-	clientCmd.Stdout = os.Stdout
-	clientCmd.Stderr = os.Stderr
-	clientCmd.Dir = clientDir
-	if err := clientCmd.Start(); err != nil {
+	w.client.Stdout = os.Stdout
+	w.client.Stderr = os.Stderr
+	w.client.Dir = w.clientDir
+	if err := w.client.Start(); err != nil {
 		t.Fatal(err)
 	}
-	defer clientCmd.Process.Kill()
+
+	return w
+}
+
+// fpath wraps filepath.Join(w.fuseMountDir, path...).
+func (w *world) fpath(path ...string) string { return w.pathJoin(w.mountDir, path) }
+
+// fpath wraps filepath.Join(w.clientDir, path...).
+func (w *world) cpath(path ...string) string { return w.pathJoin(w.clientDir, path) }
+
+func (w *world) pathJoin(base string, path []string) string {
+	arg := make([]string, 0, len(path)+1)
+	arg = append(arg, base)
+	arg = append(arg, path...)
+	return filepath.Join(arg...)
+}
+
+func (w *world) writeFile(path string, contents string) {
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		w.t.Fatalf("Error making dir %s before writing %s: %v", filepath.Dir(path), path, err)
+	}
+	if err := ioutil.WriteFile(path, []byte(contents), 0644); err != nil {
+		w.t.Fatalf("Error writing %s: %v", path, err)
+	}
+}
+
+func (w *world) release() {
+	worldsEnded++
+	if worldsEnded < testsToRun {
+		return
+	}
+	if worldsEnded > testsToRun {
+		w.t.Fatalf("unexpected number of releases called on world. forget to register in worldlyTests?")
+	}
+	w.t.Logf("(end of all tests; shutting down world)")
+
+	w.client.Process.Kill()
+	w.serverStdin.Write([]byte("q\n")) // tell FUSE server to close nicely
+	w.server.Wait()                    // TODO(bradfitz): in a goroutine racing against a time limit?
+
+	exec.Command("fusermount", "-u", w.mountDir).Run() // just in case
+
+	removeAll(w.binDir)
+	removeAll(w.mountDir)
+	removeAll(w.clientDir)
+}
+
+func removeAll(path string) {
+	if path == "" {
+		panic("removeAll of empty string?")
+	}
+	os.RemoveAll(path) // best effort: just a tempdir
+}
+
+func TestStatRegular(t *testing.T) {
+	w := getWorld(t)
+	defer w.release()
+
+	const contents = "Some file contents.\n"
+	const file = "stat_reg/file.txt"
+	w.writeFile(w.cpath(file), contents)
 
 	// Stat a regular file.
-	path := filepath.Join(mountDir, "File.txt")
-	if false {
-		straceCmd := exec.Command("strace", "-f", "stat", path)
-		straceCmd.Stdout = os.Stdout
-		straceCmd.Stderr = os.Stderr
-		straceCmd.Run()
-	}
-
-	fi, err := os.Lstat(path)
+	fi, err := os.Lstat(w.fpath(file))
 	if err != nil {
-		log.Printf("FAIL; sleeping. Mountdir: %v", mountDir)
-		time.Sleep(30 * time.Minute)
-
-		t.Fatalf("File.txt Lstat = %v; want valid file", err)
+		t.Fatalf("Lstat = %v; want valid file", err)
 	}
-	if fi.Size() != int64(len(fileContents)) {
-		t.Errorf("File.txt stat size = %d; want %d", fi.Size(), len(fileContents))
+	if fi.Size() != int64(len(contents)) {
+		t.Errorf("stat size = %d; want %d", fi.Size(), len(contents))
 	}
 	if !fi.Mode().IsRegular() {
-		t.Errorf("File.txt isn't regular")
+		t.Errorf("file isn't regular")
 	}
+}
+
+func TestStatNoExist(t *testing.T) {
+	w := getWorld(t)
+	defer w.release()
 
 	// Stat a non-existant file.
-	if _, err := os.Lstat(filepath.Join(mountDir, "File-noent.txt")); !os.IsNotExist(err) {
+	if _, err := os.Lstat(w.fpath("file-no-exist.txt")); !os.IsNotExist(err) {
 		t.Errorf("For non-existant file, want os.IsNotExist; got err = %v", err)
 	}
-
-	sin.Write([]byte("q\n")) // tell FUSE server to close nicely
-	serverCmd.Wait()
 }
 
 func isMounted(dir string) bool {
