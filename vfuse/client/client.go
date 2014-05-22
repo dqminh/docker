@@ -92,6 +92,8 @@ func (s *Server) Run() {
 			res, err = s.handleAttrRequest(m)
 		case *pb.ReaddirRequest:
 			res, err = s.handleReaddirRequest(m)
+		case *pb.ReadlinkRequest:
+			res, err = s.handleReadlinkRequest(m)
 		default:
 			log.Fatalf("client: unhandled request type %T", p.Body)
 		}
@@ -175,5 +177,16 @@ func (s *Server) handleReaddirRequest(req *pb.ReaddirRequest) (proto.Message, er
 			Mode: proto.Uint32(mapMode(fi.Mode())),
 		})
 	}
+	return res, nil
+}
+
+func (s *Server) handleReadlinkRequest(req *pb.ReadlinkRequest) (proto.Message, error) {
+	target, err := os.Readlink(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())))
+	res := new(pb.ReadlinkResponse)
+	if err != nil {
+		res.Err = mapError(err)
+		return res, nil
+	}
+	res.Target = &target
 	return res, nil
 }

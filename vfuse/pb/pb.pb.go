@@ -16,6 +16,8 @@ It has these top-level messages:
 	ReaddirRequest
 	ReaddirResponse
 	DirEntry
+	ReadlinkRequest
+	ReadlinkResponse
 */
 package pb
 
@@ -216,6 +218,46 @@ func (m *DirEntry) GetMode() uint32 {
 		return *m.Mode
 	}
 	return 0
+}
+
+type ReadlinkRequest struct {
+	Name             *string `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *ReadlinkRequest) Reset()         { *m = ReadlinkRequest{} }
+func (m *ReadlinkRequest) String() string { return proto.CompactTextString(m) }
+func (*ReadlinkRequest) ProtoMessage()    {}
+
+func (m *ReadlinkRequest) GetName() string {
+	if m != nil && m.Name != nil {
+		return *m.Name
+	}
+	return ""
+}
+
+type ReadlinkResponse struct {
+	Err              *Error  `protobuf:"bytes,1,opt,name=err" json:"err,omitempty"`
+	Target           *string `protobuf:"bytes,2,opt,name=target" json:"target,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *ReadlinkResponse) Reset()         { *m = ReadlinkResponse{} }
+func (m *ReadlinkResponse) String() string { return proto.CompactTextString(m) }
+func (*ReadlinkResponse) ProtoMessage()    {}
+
+func (m *ReadlinkResponse) GetErr() *Error {
+	if m != nil {
+		return m.Err
+	}
+	return nil
+}
+
+func (m *ReadlinkResponse) GetTarget() string {
+	if m != nil && m.Target != nil {
+		return *m.Target
+	}
+	return ""
 }
 
 func init() {

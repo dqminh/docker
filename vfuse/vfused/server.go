@@ -188,6 +188,36 @@ func (fs *FS) OpenDir(name string, context *fuse.Context) (stream []fuse.DirEntr
 	return stream, fuse.OK
 }
 
+func fuseError(err *pb.Error) fuse.Status {
+	if err == nil {
+		return fuse.OK
+	}
+	if err.GetNotExist() {
+		return fuse.ENOENT
+	}
+	// TODO: more
+	return fuse.EIO
+}
+
+func (fs *FS) Readlink(name string, context *fuse.Context) (string, fuse.Status) {
+	vlogf("fs.Readlink(%q)", name)
+	resc, err := fs.sendPacket(&pb.ReadlinkRequest{
+		Name: &name,
+	})
+	if err != nil {
+		return "", fuse.EIO
+	}
+	res, ok := (<-resc).(*pb.ReadlinkResponse)
+	if !ok {
+		vlogf("fs.Readlink(%q) = EIO because wrong type", name)
+		return "", fuse.EIO
+	}
+	if res.Err != nil {
+		return "", fuseError(res.Err)
+	}
+	return res.GetTarget(), fuse.OK
+}
+
 func (fs *FS) GetAttr(name string, context *fuse.Context) (*fuse.Attr, fuse.Status) {
 	vlogf("fs.GetAttr(%q)", name)
 
@@ -205,11 +235,7 @@ func (fs *FS) GetAttr(name string, context *fuse.Context) (*fuse.Attr, fuse.Stat
 		return nil, fuse.EIO
 	}
 	if res.Err != nil {
-		if res.Err.GetNotExist() {
-			return nil, fuse.ENOENT
-		}
-		vlogf("fs.GetAttr(%q) = EIO because some Err", name)
-		return nil, fuse.EIO
+		return nil, fuseError(res.Err)
 	}
 	attr := res.Attr
 	if attr == nil {

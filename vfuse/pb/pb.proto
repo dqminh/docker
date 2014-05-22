@@ -38,3 +38,12 @@ message DirEntry {
 	required string name = 1; // base name only
 	optional uint32 mode = 2;
 }
+
+message ReadlinkRequest {
+	required string name = 1;
+}
+
+message ReadlinkResponse {
+	optional Error err = 1;
+	optional string target = 2;
+}

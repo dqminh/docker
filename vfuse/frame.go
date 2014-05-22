@@ -17,17 +17,21 @@ import (
 type PacketType uint32
 
 const (
-	AttrReqType    PacketType = 0
-	AttrResType    PacketType = 1
-	ReaddirReqType PacketType = 2
-	ReaddirResType PacketType = 3
+	AttrReqType     PacketType = 0
+	AttrResType     PacketType = 1
+	ReaddirReqType  PacketType = 2
+	ReaddirResType  PacketType = 3
+	ReadlinkReqType PacketType = 4
+	ReadlinkResType PacketType = 5
 )
 
 var messageFromType = map[PacketType]func() proto.Message{
-	AttrReqType:    func() proto.Message { return new(pb.AttrRequest) },
-	AttrResType:    func() proto.Message { return new(pb.AttrResponse) },
-	ReaddirReqType: func() proto.Message { return new(pb.ReaddirRequest) },
-	ReaddirResType: func() proto.Message { return new(pb.ReaddirResponse) },
+	AttrReqType:     func() proto.Message { return new(pb.AttrRequest) },
+	AttrResType:     func() proto.Message { return new(pb.AttrResponse) },
+	ReaddirReqType:  func() proto.Message { return new(pb.ReaddirRequest) },
+	ReaddirResType:  func() proto.Message { return new(pb.ReaddirResponse) },
+	ReadlinkReqType: func() proto.Message { return new(pb.ReadlinkRequest) },
+	ReadlinkResType: func() proto.Message { return new(pb.ReadlinkResponse) },
 }
 
 var packetTypeFromMessage = map[reflect.Type]PacketType{}
