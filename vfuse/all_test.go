@@ -5,6 +5,7 @@ package vfuse
 import (
 	"bytes"
 	"flag"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -22,7 +23,7 @@ import (
 
 var (
 	verbose = flag.Bool("verbose", false, "verbose")
-	broken = flag.Bool("broken", false, "Run known-broken tests")
+	broken  = flag.Bool("broken", false, "Run known-broken tests")
 )
 
 func knownBroken(t *testing.T) {
@@ -330,7 +331,7 @@ func TestStatSymlink(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Lstat = %v", err)
 	}
-	if fi.Mode() & os.ModeSymlink == 0 {
+	if fi.Mode()&os.ModeSymlink == 0 {
 		t.Errorf("Mode = %v; want symlink bit", fi.Mode())
 	}
 }
@@ -388,5 +389,43 @@ func TestReaddirnames(t *testing.T) {
 	}
 	if err := f.Close(); err != nil {
 		t.Error(err)
+	}
+}
+
+// Readdirnames on non-empty dir
+func init() { addWorldTest("TestReaddirWalk") }
+func TestReaddirWalk(t *testing.T) {
+	w := getWorld(t)
+	defer w.release()
+
+	w.writeFile(w.cpath("dirwalk/1.txt"), "one")
+	w.writeFile(w.cpath("dirwalk/sub/2.txt"), "and two")
+
+	var got bytes.Buffer
+	err := filepath.Walk(w.fpath("dirwalk"), func(path string, fi os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(w.fpath("."), path)
+		if err != nil {
+			t.Fatalf("Rel: %v", err)
+		}
+		fmt.Fprintf(&got, "%v = %v", filepath.ToSlash(rel), fi.Mode())
+		if fi.Mode().IsRegular() {
+			fmt.Fprintf(&got, " (size %d)", fi.Size())
+		}
+		got.WriteByte('\n')
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Walk error: %v", err)
+	}
+	want := `dirwalk = drwxr-x---
+dirwalk/1.txt = -rw-r----- (size 3)
+dirwalk/sub = drwxr-x---
+dirwalk/sub/2.txt = -rw-r----- (size 7)
+`
+	if got.String() != want {
+		t.Errorf("Walk got:\n%s\n\nWant:\n%s", got.String(), want)
 	}
 }
