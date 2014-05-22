@@ -10,14 +10,26 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"runtime"
+	"sort"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
 
-var verbose = flag.Bool("verbose", false, "verbose")
+var (
+	verbose = flag.Bool("verbose", false, "verbose")
+	broken = flag.Bool("broken", false, "Run known-broken tests")
+)
+
+func knownBroken(t *testing.T) {
+	if !*broken {
+		t.Skip("skipping known-broken test")
+	}
+}
 
 // This is the list of tests that call getWorld. It's used so we know
 // how many tests will ultimately be run and when to do a best-effort
@@ -27,17 +39,53 @@ var verbose = flag.Bool("verbose", false, "verbose")
 // using runtime.Stack and finding the goroutine in testing.Main and
 // finding the argument with the slice of InternalTest and using some
 // strconv and unsafe. That would be gross and awesome.
+var worldlyTests []string
 
-var worldlyTests = []string{
-	"TestStatRegular",
-	"TestStatNoExist",
-	"TestStatDir",
+func isWorldTest(name string) bool {
+	for _, n := range worldlyTests {
+		if n == name {
+			return true
+		}
+	}
+	return false
+}
+
+// addWorldTest registers a test name that might call getWorld.
+func addWorldTest(name string) {
+	if !strings.HasPrefix(name, "Test") {
+		panic("bogus registration of non-Test")
+	}
+	if isWorldTest(name) {
+		panic("duplicate registration of " + name)
+	}
+	worldlyTests = append(worldlyTests, name)
+}
+
+func currentTestName() string {
+	pc, _, _, ok := runtime.Caller(2)
+	if !ok {
+		panic("Caller failed")
+	}
+	f := runtime.FuncForPC(pc)
+	if f == nil {
+		panic("can't find FuncForPC of test caller")
+	}
+	testName := f.Name()
+	i := strings.Index(testName, "Test")
+	if i < 0 {
+		panic("unexpected test name: " + testName)
+	}
+	return testName[i:]
 }
 
 func getWorld(t *testing.T) *world {
 	if runtime.GOOS != "linux" {
 		t.Skip("test only runs on linux")
 	}
+	if n := currentTestName(); !isWorldTest(n) {
+		t.Fatalf("getWorld called from %v which was not registered with addWorldTest", n)
+	}
+
 	currentTest = t
 	if w := singleWorld; w != nil {
 		w.t = t
@@ -161,10 +209,14 @@ func (w *world) pathJoin(base string, path []string) string {
 	return filepath.Join(arg...)
 }
 
-func (w *world) writeFile(path string, contents string) {
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		w.t.Fatalf("Error making dir %s before writing %s: %v", filepath.Dir(path), path, err)
+func (w *world) mkdir(path string) {
+	if err := os.MkdirAll(path, 0755); err != nil {
+		w.t.Fatalf("Error making dir %s: %v", path, err)
 	}
+}
+
+func (w *world) writeFile(path string, contents string) {
+	w.mkdir(filepath.Dir(path))
 	if err := ioutil.WriteFile(path, []byte(contents), 0644); err != nil {
 		w.t.Fatalf("Error writing %s: %v", path, err)
 	}
@@ -212,6 +264,7 @@ func removeAll(path string) {
 }
 
 // Stat a regular file.
+func init() { addWorldTest("TestStatRegular") }
 func TestStatRegular(t *testing.T) {
 	w := getWorld(t)
 	defer w.release()
@@ -233,6 +286,7 @@ func TestStatRegular(t *testing.T) {
 }
 
 // Stat a non-existant file.
+func init() { addWorldTest("TestStatNoExist") }
 func TestStatNoExist(t *testing.T) {
 	w := getWorld(t)
 	defer w.release()
@@ -243,6 +297,7 @@ func TestStatNoExist(t *testing.T) {
 }
 
 // Stat a directory.
+func init() { addWorldTest("TestStatDir") }
 func TestStatDir(t *testing.T) {
 	w := getWorld(t)
 	defer w.release()
@@ -256,5 +311,60 @@ func TestStatDir(t *testing.T) {
 	}
 	if !fi.IsDir() {
 		t.Errorf("Mode = %v; want Dir", fi.Mode())
+	}
+}
+
+// Readdirnames on empty dir
+func init() { addWorldTest("TestReaddirnamesEmpty") }
+func TestReaddirnamesEmpty(t *testing.T) {
+	w := getWorld(t)
+	defer w.release()
+
+	const dir = "readdir_empty"
+	w.mkdir(w.cpath(dir))
+
+	f, err := os.Open(w.fpath(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	names, err := f.Readdirnames(-1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(names) != 0 {
+		t.Errorf("Readdirnames = %q; want empty", names)
+	}
+	if err := f.Close(); err != nil {
+		t.Error(err)
+	}
+}
+
+// Readdirnames on non-empty dir
+func init() { addWorldTest("TestReaddirnames") }
+func TestReaddirnames(t *testing.T) {
+	w := getWorld(t)
+	defer w.release()
+	knownBroken(t)
+
+	w.writeFile(w.cpath("dirnames/1.txt"), "file one")
+	w.writeFile(w.cpath("dirnames/2.txt"), "file two")
+
+	f, err := os.Open(w.fpath("dirnames"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	names, err := f.Readdirnames(-1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Strings(names)
+	want := []string{"1.txt", "2.txt"}
+	if !reflect.DeepEqual(names, want) {
+		t.Errorf("Readdirnames = %q; want %q", names, want)
+	}
+	if err := f.Close(); err != nil {
+		t.Error(err)
 	}
 }
