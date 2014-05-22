@@ -336,7 +336,27 @@ func TestStatSymlink(t *testing.T) {
 	}
 }
 
-// TODO: readlink
+// Readlink a symlink.
+func init() { addWorldTest("TestReadlink") }
+func TestReadlink(t *testing.T) {
+	w := getWorld(t)
+	defer w.release()
+	knownBroken(t)
+
+	const target = "some-target"
+	w.mkdir(w.cpath("stat_symlink"))
+	if err := os.Symlink(target, w.cpath("stat_symlink/link")); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := os.Readlink(w.fpath("stat_symlink/link"))
+	if err != nil {
+		t.Fatalf("Readlink = %v", err)
+	}
+	if got != target {
+		t.Errorf("Readlink = %q; want %q", got, target)
+	}
+}
 
 // Readdirnames on empty dir
 func init() { addWorldTest("TestReaddirnamesEmpty") }
