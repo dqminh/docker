@@ -133,6 +133,8 @@ func mapMode(m os.FileMode) uint32 {
 		mode |= S_IFDIR
 	} else if m.IsRegular() {
 		mode |= S_IFREG
+	} else if m & os.ModeSymlink != 0 {
+		mode |= S_IFLNK
 	}
 	// TODO: more
 	return mode

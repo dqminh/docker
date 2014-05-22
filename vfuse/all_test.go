@@ -304,8 +304,7 @@ func TestStatDir(t *testing.T) {
 	w := getWorld(t)
 	defer w.release()
 
-	const file = "stat_dir/file.txt"
-	w.writeFile(w.cpath(file), "just to make the dir")
+	w.mkdir(w.cpath("stat_dir"))
 
 	fi, err := os.Lstat(w.fpath("stat_dir"))
 	if err != nil {
@@ -315,6 +314,28 @@ func TestStatDir(t *testing.T) {
 		t.Errorf("Mode = %v; want Dir", fi.Mode())
 	}
 }
+
+// Stat a symlink.
+func init() { addWorldTest("TestStatSymlink") }
+func TestStatSymlink(t *testing.T) {
+	w := getWorld(t)
+	defer w.release()
+
+	w.mkdir(w.cpath("stat_symlink"))
+	if err := os.Symlink("some-target", w.cpath("stat_symlink/link")); err != nil {
+		t.Fatal(err)
+	}
+
+	fi, err := os.Lstat(w.fpath("stat_symlink/link"))
+	if err != nil {
+		t.Fatalf("Lstat = %v", err)
+	}
+	if fi.Mode() & os.ModeSymlink == 0 {
+		t.Errorf("Mode = %v; want symlink bit", fi.Mode())
+	}
+}
+
+// TODO: readlink
 
 // Readdirnames on empty dir
 func init() { addWorldTest("TestReaddirnamesEmpty") }
