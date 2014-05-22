@@ -31,6 +31,7 @@ var verbose = flag.Bool("verbose", false, "verbose")
 var worldlyTests = []string{
 	"TestStatRegular",
 	"TestStatNoExist",
+	"TestStatDir",
 }
 
 func getWorld(t *testing.T) *world {
@@ -190,6 +191,19 @@ func (w *world) release() {
 	removeAll(w.clientDir)
 }
 
+func isMounted(dir string) bool {
+	slurp, _ := ioutil.ReadFile("/proc/mounts")
+	return bytes.Contains(slurp, []byte(dir)) // close enough.
+}
+
+func tempDir(t *testing.T, name string) string {
+	dir, err := ioutil.TempDir("", name)
+	if err != nil {
+		t.Fatalf("Error making temp dir: %v", err)
+	}
+	return dir
+}
+
 func removeAll(path string) {
 	if path == "" {
 		panic("removeAll of empty string?")
@@ -197,6 +211,7 @@ func removeAll(path string) {
 	os.RemoveAll(path) // best effort: just a tempdir
 }
 
+// Stat a regular file.
 func TestStatRegular(t *testing.T) {
 	w := getWorld(t)
 	defer w.release()
@@ -205,7 +220,6 @@ func TestStatRegular(t *testing.T) {
 	const file = "stat_reg/file.txt"
 	w.writeFile(w.cpath(file), contents)
 
-	// Stat a regular file.
 	fi, err := os.Lstat(w.fpath(file))
 	if err != nil {
 		t.Fatalf("Lstat = %v; want valid file", err)
@@ -218,25 +232,29 @@ func TestStatRegular(t *testing.T) {
 	}
 }
 
+// Stat a non-existant file.
 func TestStatNoExist(t *testing.T) {
 	w := getWorld(t)
 	defer w.release()
 
-	// Stat a non-existant file.
 	if _, err := os.Lstat(w.fpath("file-no-exist.txt")); !os.IsNotExist(err) {
 		t.Errorf("For non-existant file, want os.IsNotExist; got err = %v", err)
 	}
 }
 
-func isMounted(dir string) bool {
-	slurp, _ := ioutil.ReadFile("/proc/mounts")
-	return bytes.Contains(slurp, []byte(dir)) // close enough.
-}
+// Stat a directory.
+func TestStatDir(t *testing.T) {
+	w := getWorld(t)
+	defer w.release()
 
-func tempDir(t *testing.T, name string) string {
-	dir, err := ioutil.TempDir("", name)
+	const file = "stat_dir/file.txt"
+	w.writeFile(w.cpath(file), "just to make the dir")
+
+	fi, err := os.Lstat(w.fpath("stat_dir"))
 	if err != nil {
-		t.Fatalf("Error making temp dir: %v", err)
+		t.Fatalf("Lstat = %v", err)
 	}
-	return dir
+	if !fi.IsDir() {
+		t.Errorf("Mode = %v; want Dir", fi.Mode())
+	}
 }
