@@ -86,51 +86,92 @@ func (s *Server) Run() {
 
 		vlogf("client: got packet %+v %T", p.Header, p.Body)
 
+		var res proto.Message
 		switch m := p.Body.(type) {
 		case *pb.AttrRequest:
-			s.handleAttrRequest(p.ID, m)
+			res, err = s.handleAttrRequest(m)
+		case *pb.ReaddirRequest:
+			res, err = s.handleReaddirRequest(m)
 		default:
 			log.Fatalf("client: unhandled request type %T", p.Body)
+		}
+
+		if err != nil {
+			log.Fatalf("Error handling %T: %v", p.Body, err)
+		}
+		err = s.c.WriteReply(p.ID, res)
+		if err != nil {
+			log.Fatal(err)
 		}
 	}
 }
 
-func (s *Server) handleAttrRequest(id uint64, req *pb.AttrRequest) {
+func mapError(err error) *pb.Error {
+	if err == nil {
+		return nil
+	}
+	if os.IsNotExist(err) {
+		return &pb.Error{NotExist: proto.Bool(true)}
+	}
+	// TODO: more specific types
+	return &pb.Error{Other: proto.String(err.Error())}
+}
+
+// mapMode maps from a Go os.FileMode to a Linux FUSE uint32 mode.
+func mapMode(m os.FileMode) uint32 {
+	mode := uint32(m & 0777)
+	const (
+		S_IFBLK  = 0x6000
+		S_IFCHR  = 0x2000
+		S_IFDIR  = 0x4000
+		S_IFIFO  = 0x1000
+		S_IFLNK  = 0xa000
+		S_IFREG  = 0x8000
+		S_IFSOCK = 0xc000
+	)
+	if m.IsDir() {
+		mode |= S_IFDIR
+	} else if m.IsRegular() {
+		mode |= S_IFREG
+	}
+	// TODO: more
+	return mode
+}
+
+func (s *Server) handleAttrRequest(req *pb.AttrRequest) (proto.Message, error) {
 	fi, err := os.Lstat(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())))
 	res := new(pb.AttrResponse)
 	if err != nil {
-		if os.IsNotExist(err) {
-			res.Err = &pb.Error{NotExist: proto.Bool(true)}
-		} else {
-			// TODO: more specific types
-			res.Err = &pb.Error{Other: proto.String(err.Error())}
-		}
-	} else {
-		mode := uint32(fi.Mode() & 0777)
-		const (
-			S_IFBLK  = 0x6000
-			S_IFCHR  = 0x2000
-			S_IFDIR  = 0x4000
-			S_IFIFO  = 0x1000
-			S_IFLNK  = 0xa000
-			S_IFREG  = 0x8000
-			S_IFSOCK = 0xc000
-		)
-		if fi.IsDir() {
-			mode |= S_IFDIR
-		} else if fi.Mode().IsRegular() {
-			mode |= S_IFREG
-		}
-		res.Attr = &pb.Attr{
-			Size: proto.Uint64(uint64(fi.Size())),
-			Mode: proto.Uint32(mode),
-			// TODO: more
-		}
+		res.Err = mapError(err)
+		return res, nil
 	}
+	res.Attr = &pb.Attr{
+		Size: proto.Uint64(uint64(fi.Size())),
+		Mode: proto.Uint32(mapMode(fi.Mode())),
+		// TODO: more
+	}
+	return res, nil
+}
 
-	// TODO: factor this out into Run or elsewhere
-	err = s.c.WriteReply(id, res)
+func (s *Server) handleReaddirRequest(req *pb.ReaddirRequest) (proto.Message, error) {
+	f, err := os.Open(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())))
+	res := new(pb.ReaddirResponse)
 	if err != nil {
-		log.Fatal(err)
+		res.Err = mapError(err)
+		return res, nil
 	}
+	defer f.Close()
+	all, err := f.Readdir(-1)
+	if err != nil {
+		res.Err = mapError(err)
+		return res, nil
+	}
+	res.Entry = make([]*pb.DirEntry, 0, len(all))
+	for _, fi := range all {
+		res.Entry = append(res.Entry, &pb.DirEntry{
+			Name: proto.String(fi.Name()),
+			Mode: proto.Uint32(mapMode(fi.Mode())),
+		})
+	}
+	return res, nil
 }

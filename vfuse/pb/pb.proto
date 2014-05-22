@@ -1,5 +1,11 @@
 package pb;
 
+message Error {
+	// Only one may be set.
+	optional bool not_exist = 1;
+	optional string other = 2;
+}
+
 message AttrRequest {
 	required string name = 1;
 }
@@ -19,8 +25,16 @@ message Attr {
 	optional uint32 nlink = 7;
 }
 
-message Error {
-	// Only one may be set.
-	optional bool not_exist = 1;
-	optional string other = 2;
+message ReaddirRequest {
+	required string name = 1;
+}
+
+message ReaddirResponse {
+	optional Error err = 1;
+	repeated DirEntry entry = 2;
+}
+
+message DirEntry {
+	required string name = 1; // base name only
+	optional uint32 mode = 2;
 }

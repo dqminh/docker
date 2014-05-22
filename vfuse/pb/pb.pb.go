@@ -9,10 +9,13 @@ It is generated from these files:
 	pb.proto
 
 It has these top-level messages:
+	Error
 	AttrRequest
 	AttrResponse
 	Attr
-	Error
+	ReaddirRequest
+	ReaddirResponse
+	DirEntry
 */
 package pb
 
@@ -22,6 +25,30 @@ import math "math"
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
 var _ = math.Inf
+
+type Error struct {
+	NotExist         *bool   `protobuf:"varint,1,opt,name=not_exist" json:"not_exist,omitempty"`
+	Other            *string `protobuf:"bytes,2,opt,name=other" json:"other,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *Error) Reset()         { *m = Error{} }
+func (m *Error) String() string { return proto.CompactTextString(m) }
+func (*Error) ProtoMessage()    {}
+
+func (m *Error) GetNotExist() bool {
+	if m != nil && m.NotExist != nil {
+		return *m.NotExist
+	}
+	return false
+}
+
+func (m *Error) GetOther() string {
+	if m != nil && m.Other != nil {
+		return *m.Other
+	}
+	return ""
+}
 
 type AttrRequest struct {
 	Name             *string `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
@@ -127,28 +154,68 @@ func (m *Attr) GetNlink() uint32 {
 	return 0
 }
 
-type Error struct {
-	NotExist         *bool   `protobuf:"varint,1,opt,name=not_exist" json:"not_exist,omitempty"`
-	Other            *string `protobuf:"bytes,2,opt,name=other" json:"other,omitempty"`
+type ReaddirRequest struct {
+	Name             *string `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *Error) Reset()         { *m = Error{} }
-func (m *Error) String() string { return proto.CompactTextString(m) }
-func (*Error) ProtoMessage()    {}
+func (m *ReaddirRequest) Reset()         { *m = ReaddirRequest{} }
+func (m *ReaddirRequest) String() string { return proto.CompactTextString(m) }
+func (*ReaddirRequest) ProtoMessage()    {}
 
-func (m *Error) GetNotExist() bool {
-	if m != nil && m.NotExist != nil {
-		return *m.NotExist
-	}
-	return false
-}
-
-func (m *Error) GetOther() string {
-	if m != nil && m.Other != nil {
-		return *m.Other
+func (m *ReaddirRequest) GetName() string {
+	if m != nil && m.Name != nil {
+		return *m.Name
 	}
 	return ""
+}
+
+type ReaddirResponse struct {
+	Err              *Error      `protobuf:"bytes,1,opt,name=err" json:"err,omitempty"`
+	Entry            []*DirEntry `protobuf:"bytes,2,rep,name=entry" json:"entry,omitempty"`
+	XXX_unrecognized []byte      `json:"-"`
+}
+
+func (m *ReaddirResponse) Reset()         { *m = ReaddirResponse{} }
+func (m *ReaddirResponse) String() string { return proto.CompactTextString(m) }
+func (*ReaddirResponse) ProtoMessage()    {}
+
+func (m *ReaddirResponse) GetErr() *Error {
+	if m != nil {
+		return m.Err
+	}
+	return nil
+}
+
+func (m *ReaddirResponse) GetEntry() []*DirEntry {
+	if m != nil {
+		return m.Entry
+	}
+	return nil
+}
+
+type DirEntry struct {
+	Name             *string `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
+	Mode             *uint32 `protobuf:"varint,2,opt,name=mode" json:"mode,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *DirEntry) Reset()         { *m = DirEntry{} }
+func (m *DirEntry) String() string { return proto.CompactTextString(m) }
+func (*DirEntry) ProtoMessage()    {}
+
+func (m *DirEntry) GetName() string {
+	if m != nil && m.Name != nil {
+		return *m.Name
+	}
+	return ""
+}
+
+func (m *DirEntry) GetMode() uint32 {
+	if m != nil && m.Mode != nil {
+		return *m.Mode
+	}
+	return 0
 }
 
 func init() {

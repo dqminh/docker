@@ -161,8 +161,31 @@ func (fs *FS) Open(name string, flags uint32, context *fuse.Context) (file nodef
 }
 
 func (fs *FS) OpenDir(name string, context *fuse.Context) (stream []fuse.DirEntry, code fuse.Status) {
-	vlogf("OpenDir(%q)", name)
-	return nil, fuse.OK
+	vlogf("fs.OpenDir(%q)", name)
+	resc, err := fs.sendPacket(&pb.ReaddirRequest{
+		Name: &name,
+	})
+	if err != nil {
+		return nil, fuse.EIO
+	}
+	res, ok := (<-resc).(*pb.ReaddirResponse)
+	if !ok {
+		return nil, fuse.EIO
+	}
+	if res.Err != nil {
+		if res.Err.GetNotExist() {
+			return nil, fuse.ENOENT
+		}
+		return nil, fuse.EIO // TODO: more specific error types?
+	}
+	stream = make([]fuse.DirEntry, len(res.Entry))
+	for i, ent := range res.Entry {
+		stream[i] = fuse.DirEntry{
+			Name: ent.GetName(),
+			Mode: ent.GetMode(),
+		}
+	}
+	return stream, fuse.OK
 }
 
 func (fs *FS) GetAttr(name string, context *fuse.Context) (*fuse.Attr, fuse.Status) {

@@ -162,8 +162,10 @@ func newWorld(t *testing.T) *world {
 		"--listen="+strconv.Itoa(w.port),
 		"--verbose="+strconv.FormatBool(*verbose),
 	)
-	w.server.Stdout = os.Stdout
-	w.server.Stderr = os.Stderr
+	if *verbose {
+		w.server.Stdout = os.Stdout
+		w.server.Stderr = os.Stderr
+	}
 	sin, err := w.server.StdinPipe()
 	if err != nil {
 		t.Fatal(err)
@@ -345,7 +347,6 @@ func init() { addWorldTest("TestReaddirnames") }
 func TestReaddirnames(t *testing.T) {
 	w := getWorld(t)
 	defer w.release()
-	knownBroken(t)
 
 	w.writeFile(w.cpath("dirnames/1.txt"), "file one")
 	w.writeFile(w.cpath("dirnames/2.txt"), "file two")
