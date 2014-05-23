@@ -7,7 +7,9 @@ message Error {
 }
 
 message AttrRequest {
-	required string name = 1;
+	// One of name or handle must be set:
+	optional string name = 1;
+	optional uint64 handle = 2;
 }
 
 message AttrResponse {
@@ -46,4 +48,154 @@ message ReadlinkRequest {
 message ReadlinkResponse {
 	optional Error err = 1;
 	optional string target = 2;
+}
+
+message ChmodRequest {
+	// One of name or handle must be set:
+	optional string name = 1;
+	optional uint64 handle = 2;
+
+	required uint32 mode = 3;
+}
+
+message ChmodResponse {
+	optional Error err = 1;
+}
+
+message ChownRequest {
+	// One of name or handle must be set:
+	optional string name = 1;
+	optional uint64 handle = 2;
+
+	// This can set either the userid or the groupid, or both,
+	// depending on what's set. The server should send both the numeric
+	// and named version of the user and/or group, for the client to
+	// determine the mapping, since the two machines will likely have
+	// different sets of users.
+	optional uint32 uid = 3;
+	optional uint32 gid = 4;
+	optional string user = 5;
+	optional string group  = 6;
+}
+
+message ChownResponse {
+	optional Error err = 1;
+}
+
+message Time {
+	// Like a Go time.Time.
+	required int64 sec = 1; // from unix epoch
+	optional int32 nsec = 2;
+}
+
+message UtimeRequest {
+	// One of name or handle must be set:
+	optional string name = 1;
+	optional uint64 handle = 2;
+
+	optional Time atime = 3; // set if changing
+	optional Time mtime = 4; // set if changing
+}
+
+message UtimeResponse {
+	optional Error err = 1;
+}
+
+message TruncateRequest {
+	// One of name or handle must be set:
+	optional string name = 1;
+	optional uint64 handle = 2;
+
+	required uint64 size = 3;
+}
+
+message TruncateResponse {
+	optional Error err = 1;
+}
+
+message LinkRequest {
+//...
+}
+
+message LinkResponse {
+//...
+}
+
+message SymlinkRequest {
+//...
+}
+
+message SymlinkResponse {
+//...
+}
+
+message MkdirRequest {
+//...
+}
+
+message MkdirResponse {
+//...
+}
+
+message MknodRequest {
+//...
+}
+
+message MknodResponse {
+//...
+}
+
+message RenameRequest {
+//...
+}
+
+message RenameResponse {
+//...
+}
+
+message RmdirRequest {
+//...
+}
+
+message RmdirResponse {
+//...
+}
+
+message UnlinkRequest {
+	required string name = 1;
+}
+
+message UnlinkResponse {
+	optional Error err = 1;
+}
+
+message OpenRequest {
+	required string name = 1;
+	optional uint32 flags = 2;
+}
+
+message OpenResponse {
+	optional Error err = 1;
+	optional uint64 handle = 2;
+}
+
+message CreateRequest {
+	required string name = 1;
+	optional uint32 flags = 2;
+	optional uint32 mode = 3;
+}
+
+message CreateResponse {
+	optional Error err = 1;
+	optional uint64 handle = 2;
+}
+
+message ReadRequest {
+}
+message ReadResponse {
+}
+
+message WriteRequest {
+}
+message WriteResponse {
 }

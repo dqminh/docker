@@ -18,6 +18,37 @@ It has these top-level messages:
 	DirEntry
 	ReadlinkRequest
 	ReadlinkResponse
+	ChmodRequest
+	ChmodResponse
+	ChownRequest
+	ChownResponse
+	Time
+	UtimeRequest
+	UtimeResponse
+	TruncateRequest
+	TruncateResponse
+	LinkRequest
+	LinkResponse
+	SymlinkRequest
+	SymlinkResponse
+	MkdirRequest
+	MkdirResponse
+	MknodRequest
+	MknodResponse
+	RenameRequest
+	RenameResponse
+	RmdirRequest
+	RmdirResponse
+	UnlinkRequest
+	UnlinkResponse
+	OpenRequest
+	OpenResponse
+	CreateRequest
+	CreateResponse
+	ReadRequest
+	ReadResponse
+	WriteRequest
+	WriteResponse
 */
 package pb
 
@@ -53,7 +84,8 @@ func (m *Error) GetOther() string {
 }
 
 type AttrRequest struct {
-	Name             *string `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
+	Name             *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
+	Handle           *uint64 `protobuf:"varint,2,opt,name=handle" json:"handle,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
 
@@ -66,6 +98,13 @@ func (m *AttrRequest) GetName() string {
 		return *m.Name
 	}
 	return ""
+}
+
+func (m *AttrRequest) GetHandle() uint64 {
+	if m != nil && m.Handle != nil {
+		return *m.Handle
+	}
+	return 0
 }
 
 type AttrResponse struct {
@@ -259,6 +298,518 @@ func (m *ReadlinkResponse) GetTarget() string {
 	}
 	return ""
 }
+
+type ChmodRequest struct {
+	Name             *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
+	Handle           *uint64 `protobuf:"varint,2,opt,name=handle" json:"handle,omitempty"`
+	Mode             *uint32 `protobuf:"varint,3,req,name=mode" json:"mode,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *ChmodRequest) Reset()         { *m = ChmodRequest{} }
+func (m *ChmodRequest) String() string { return proto.CompactTextString(m) }
+func (*ChmodRequest) ProtoMessage()    {}
+
+func (m *ChmodRequest) GetName() string {
+	if m != nil && m.Name != nil {
+		return *m.Name
+	}
+	return ""
+}
+
+func (m *ChmodRequest) GetHandle() uint64 {
+	if m != nil && m.Handle != nil {
+		return *m.Handle
+	}
+	return 0
+}
+
+func (m *ChmodRequest) GetMode() uint32 {
+	if m != nil && m.Mode != nil {
+		return *m.Mode
+	}
+	return 0
+}
+
+type ChmodResponse struct {
+	Err              *Error `protobuf:"bytes,1,opt,name=err" json:"err,omitempty"`
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *ChmodResponse) Reset()         { *m = ChmodResponse{} }
+func (m *ChmodResponse) String() string { return proto.CompactTextString(m) }
+func (*ChmodResponse) ProtoMessage()    {}
+
+func (m *ChmodResponse) GetErr() *Error {
+	if m != nil {
+		return m.Err
+	}
+	return nil
+}
+
+type ChownRequest struct {
+	Name             *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
+	Handle           *uint64 `protobuf:"varint,2,opt,name=handle" json:"handle,omitempty"`
+	Uid              *uint32 `protobuf:"varint,3,opt,name=uid" json:"uid,omitempty"`
+	Gid              *uint32 `protobuf:"varint,4,opt,name=gid" json:"gid,omitempty"`
+	User             *string `protobuf:"bytes,5,opt,name=user" json:"user,omitempty"`
+	Group            *string `protobuf:"bytes,6,opt,name=group" json:"group,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *ChownRequest) Reset()         { *m = ChownRequest{} }
+func (m *ChownRequest) String() string { return proto.CompactTextString(m) }
+func (*ChownRequest) ProtoMessage()    {}
+
+func (m *ChownRequest) GetName() string {
+	if m != nil && m.Name != nil {
+		return *m.Name
+	}
+	return ""
+}
+
+func (m *ChownRequest) GetHandle() uint64 {
+	if m != nil && m.Handle != nil {
+		return *m.Handle
+	}
+	return 0
+}
+
+func (m *ChownRequest) GetUid() uint32 {
+	if m != nil && m.Uid != nil {
+		return *m.Uid
+	}
+	return 0
+}
+
+func (m *ChownRequest) GetGid() uint32 {
+	if m != nil && m.Gid != nil {
+		return *m.Gid
+	}
+	return 0
+}
+
+func (m *ChownRequest) GetUser() string {
+	if m != nil && m.User != nil {
+		return *m.User
+	}
+	return ""
+}
+
+func (m *ChownRequest) GetGroup() string {
+	if m != nil && m.Group != nil {
+		return *m.Group
+	}
+	return ""
+}
+
+type ChownResponse struct {
+	Err              *Error `protobuf:"bytes,1,opt,name=err" json:"err,omitempty"`
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *ChownResponse) Reset()         { *m = ChownResponse{} }
+func (m *ChownResponse) String() string { return proto.CompactTextString(m) }
+func (*ChownResponse) ProtoMessage()    {}
+
+func (m *ChownResponse) GetErr() *Error {
+	if m != nil {
+		return m.Err
+	}
+	return nil
+}
+
+type Time struct {
+	Sec              *int64 `protobuf:"varint,1,req,name=sec" json:"sec,omitempty"`
+	Nsec             *int32 `protobuf:"varint,2,opt,name=nsec" json:"nsec,omitempty"`
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *Time) Reset()         { *m = Time{} }
+func (m *Time) String() string { return proto.CompactTextString(m) }
+func (*Time) ProtoMessage()    {}
+
+func (m *Time) GetSec() int64 {
+	if m != nil && m.Sec != nil {
+		return *m.Sec
+	}
+	return 0
+}
+
+func (m *Time) GetNsec() int32 {
+	if m != nil && m.Nsec != nil {
+		return *m.Nsec
+	}
+	return 0
+}
+
+type UtimeRequest struct {
+	Name             *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
+	Handle           *uint64 `protobuf:"varint,2,opt,name=handle" json:"handle,omitempty"`
+	Atime            *Time   `protobuf:"bytes,3,opt,name=atime" json:"atime,omitempty"`
+	Mtime            *Time   `protobuf:"bytes,4,opt,name=mtime" json:"mtime,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *UtimeRequest) Reset()         { *m = UtimeRequest{} }
+func (m *UtimeRequest) String() string { return proto.CompactTextString(m) }
+func (*UtimeRequest) ProtoMessage()    {}
+
+func (m *UtimeRequest) GetName() string {
+	if m != nil && m.Name != nil {
+		return *m.Name
+	}
+	return ""
+}
+
+func (m *UtimeRequest) GetHandle() uint64 {
+	if m != nil && m.Handle != nil {
+		return *m.Handle
+	}
+	return 0
+}
+
+func (m *UtimeRequest) GetAtime() *Time {
+	if m != nil {
+		return m.Atime
+	}
+	return nil
+}
+
+func (m *UtimeRequest) GetMtime() *Time {
+	if m != nil {
+		return m.Mtime
+	}
+	return nil
+}
+
+type UtimeResponse struct {
+	Err              *Error `protobuf:"bytes,1,opt,name=err" json:"err,omitempty"`
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *UtimeResponse) Reset()         { *m = UtimeResponse{} }
+func (m *UtimeResponse) String() string { return proto.CompactTextString(m) }
+func (*UtimeResponse) ProtoMessage()    {}
+
+func (m *UtimeResponse) GetErr() *Error {
+	if m != nil {
+		return m.Err
+	}
+	return nil
+}
+
+type TruncateRequest struct {
+	Name             *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
+	Handle           *uint64 `protobuf:"varint,2,opt,name=handle" json:"handle,omitempty"`
+	Size             *uint64 `protobuf:"varint,3,req,name=size" json:"size,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *TruncateRequest) Reset()         { *m = TruncateRequest{} }
+func (m *TruncateRequest) String() string { return proto.CompactTextString(m) }
+func (*TruncateRequest) ProtoMessage()    {}
+
+func (m *TruncateRequest) GetName() string {
+	if m != nil && m.Name != nil {
+		return *m.Name
+	}
+	return ""
+}
+
+func (m *TruncateRequest) GetHandle() uint64 {
+	if m != nil && m.Handle != nil {
+		return *m.Handle
+	}
+	return 0
+}
+
+func (m *TruncateRequest) GetSize() uint64 {
+	if m != nil && m.Size != nil {
+		return *m.Size
+	}
+	return 0
+}
+
+type TruncateResponse struct {
+	Err              *Error `protobuf:"bytes,1,opt,name=err" json:"err,omitempty"`
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *TruncateResponse) Reset()         { *m = TruncateResponse{} }
+func (m *TruncateResponse) String() string { return proto.CompactTextString(m) }
+func (*TruncateResponse) ProtoMessage()    {}
+
+func (m *TruncateResponse) GetErr() *Error {
+	if m != nil {
+		return m.Err
+	}
+	return nil
+}
+
+type LinkRequest struct {
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *LinkRequest) Reset()         { *m = LinkRequest{} }
+func (m *LinkRequest) String() string { return proto.CompactTextString(m) }
+func (*LinkRequest) ProtoMessage()    {}
+
+type LinkResponse struct {
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *LinkResponse) Reset()         { *m = LinkResponse{} }
+func (m *LinkResponse) String() string { return proto.CompactTextString(m) }
+func (*LinkResponse) ProtoMessage()    {}
+
+type SymlinkRequest struct {
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *SymlinkRequest) Reset()         { *m = SymlinkRequest{} }
+func (m *SymlinkRequest) String() string { return proto.CompactTextString(m) }
+func (*SymlinkRequest) ProtoMessage()    {}
+
+type SymlinkResponse struct {
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *SymlinkResponse) Reset()         { *m = SymlinkResponse{} }
+func (m *SymlinkResponse) String() string { return proto.CompactTextString(m) }
+func (*SymlinkResponse) ProtoMessage()    {}
+
+type MkdirRequest struct {
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *MkdirRequest) Reset()         { *m = MkdirRequest{} }
+func (m *MkdirRequest) String() string { return proto.CompactTextString(m) }
+func (*MkdirRequest) ProtoMessage()    {}
+
+type MkdirResponse struct {
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *MkdirResponse) Reset()         { *m = MkdirResponse{} }
+func (m *MkdirResponse) String() string { return proto.CompactTextString(m) }
+func (*MkdirResponse) ProtoMessage()    {}
+
+type MknodRequest struct {
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *MknodRequest) Reset()         { *m = MknodRequest{} }
+func (m *MknodRequest) String() string { return proto.CompactTextString(m) }
+func (*MknodRequest) ProtoMessage()    {}
+
+type MknodResponse struct {
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *MknodResponse) Reset()         { *m = MknodResponse{} }
+func (m *MknodResponse) String() string { return proto.CompactTextString(m) }
+func (*MknodResponse) ProtoMessage()    {}
+
+type RenameRequest struct {
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *RenameRequest) Reset()         { *m = RenameRequest{} }
+func (m *RenameRequest) String() string { return proto.CompactTextString(m) }
+func (*RenameRequest) ProtoMessage()    {}
+
+type RenameResponse struct {
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *RenameResponse) Reset()         { *m = RenameResponse{} }
+func (m *RenameResponse) String() string { return proto.CompactTextString(m) }
+func (*RenameResponse) ProtoMessage()    {}
+
+type RmdirRequest struct {
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *RmdirRequest) Reset()         { *m = RmdirRequest{} }
+func (m *RmdirRequest) String() string { return proto.CompactTextString(m) }
+func (*RmdirRequest) ProtoMessage()    {}
+
+type RmdirResponse struct {
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *RmdirResponse) Reset()         { *m = RmdirResponse{} }
+func (m *RmdirResponse) String() string { return proto.CompactTextString(m) }
+func (*RmdirResponse) ProtoMessage()    {}
+
+type UnlinkRequest struct {
+	Name             *string `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *UnlinkRequest) Reset()         { *m = UnlinkRequest{} }
+func (m *UnlinkRequest) String() string { return proto.CompactTextString(m) }
+func (*UnlinkRequest) ProtoMessage()    {}
+
+func (m *UnlinkRequest) GetName() string {
+	if m != nil && m.Name != nil {
+		return *m.Name
+	}
+	return ""
+}
+
+type UnlinkResponse struct {
+	Err              *Error `protobuf:"bytes,1,opt,name=err" json:"err,omitempty"`
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *UnlinkResponse) Reset()         { *m = UnlinkResponse{} }
+func (m *UnlinkResponse) String() string { return proto.CompactTextString(m) }
+func (*UnlinkResponse) ProtoMessage()    {}
+
+func (m *UnlinkResponse) GetErr() *Error {
+	if m != nil {
+		return m.Err
+	}
+	return nil
+}
+
+type OpenRequest struct {
+	Name             *string `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
+	Flags            *uint32 `protobuf:"varint,2,opt,name=flags" json:"flags,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *OpenRequest) Reset()         { *m = OpenRequest{} }
+func (m *OpenRequest) String() string { return proto.CompactTextString(m) }
+func (*OpenRequest) ProtoMessage()    {}
+
+func (m *OpenRequest) GetName() string {
+	if m != nil && m.Name != nil {
+		return *m.Name
+	}
+	return ""
+}
+
+func (m *OpenRequest) GetFlags() uint32 {
+	if m != nil && m.Flags != nil {
+		return *m.Flags
+	}
+	return 0
+}
+
+type OpenResponse struct {
+	Err              *Error  `protobuf:"bytes,1,opt,name=err" json:"err,omitempty"`
+	Handle           *uint64 `protobuf:"varint,2,opt,name=handle" json:"handle,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *OpenResponse) Reset()         { *m = OpenResponse{} }
+func (m *OpenResponse) String() string { return proto.CompactTextString(m) }
+func (*OpenResponse) ProtoMessage()    {}
+
+func (m *OpenResponse) GetErr() *Error {
+	if m != nil {
+		return m.Err
+	}
+	return nil
+}
+
+func (m *OpenResponse) GetHandle() uint64 {
+	if m != nil && m.Handle != nil {
+		return *m.Handle
+	}
+	return 0
+}
+
+type CreateRequest struct {
+	Name             *string `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
+	Flags            *uint32 `protobuf:"varint,2,opt,name=flags" json:"flags,omitempty"`
+	Mode             *uint32 `protobuf:"varint,3,opt,name=mode" json:"mode,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *CreateRequest) Reset()         { *m = CreateRequest{} }
+func (m *CreateRequest) String() string { return proto.CompactTextString(m) }
+func (*CreateRequest) ProtoMessage()    {}
+
+func (m *CreateRequest) GetName() string {
+	if m != nil && m.Name != nil {
+		return *m.Name
+	}
+	return ""
+}
+
+func (m *CreateRequest) GetFlags() uint32 {
+	if m != nil && m.Flags != nil {
+		return *m.Flags
+	}
+	return 0
+}
+
+func (m *CreateRequest) GetMode() uint32 {
+	if m != nil && m.Mode != nil {
+		return *m.Mode
+	}
+	return 0
+}
+
+type CreateResponse struct {
+	Err              *Error  `protobuf:"bytes,1,opt,name=err" json:"err,omitempty"`
+	Handle           *uint64 `protobuf:"varint,2,opt,name=handle" json:"handle,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *CreateResponse) Reset()         { *m = CreateResponse{} }
+func (m *CreateResponse) String() string { return proto.CompactTextString(m) }
+func (*CreateResponse) ProtoMessage()    {}
+
+func (m *CreateResponse) GetErr() *Error {
+	if m != nil {
+		return m.Err
+	}
+	return nil
+}
+
+func (m *CreateResponse) GetHandle() uint64 {
+	if m != nil && m.Handle != nil {
+		return *m.Handle
+	}
+	return 0
+}
+
+type ReadRequest struct {
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *ReadRequest) Reset()         { *m = ReadRequest{} }
+func (m *ReadRequest) String() string { return proto.CompactTextString(m) }
+func (*ReadRequest) ProtoMessage()    {}
+
+type ReadResponse struct {
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *ReadResponse) Reset()         { *m = ReadResponse{} }
+func (m *ReadResponse) String() string { return proto.CompactTextString(m) }
+func (*ReadResponse) ProtoMessage()    {}
+
+type WriteRequest struct {
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *WriteRequest) Reset()         { *m = WriteRequest{} }
+func (m *WriteRequest) String() string { return proto.CompactTextString(m) }
+func (*WriteRequest) ProtoMessage()    {}
+
+type WriteResponse struct {
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *WriteResponse) Reset()         { *m = WriteResponse{} }
+func (m *WriteResponse) String() string { return proto.CompactTextString(m) }
+func (*WriteResponse) ProtoMessage()    {}
 
 func init() {
 }

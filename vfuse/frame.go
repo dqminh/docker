@@ -16,22 +16,45 @@ import (
 
 type PacketType uint32
 
-const (
-	AttrReqType     PacketType = 0
-	AttrResType     PacketType = 1
-	ReaddirReqType  PacketType = 2
-	ReaddirResType  PacketType = 3
-	ReadlinkReqType PacketType = 4
-	ReadlinkResType PacketType = 5
+var (
+	maxPacketType   PacketType
+	messageFromType = map[PacketType]func() proto.Message{}
 )
 
-var messageFromType = map[PacketType]func() proto.Message{
-	AttrReqType:     func() proto.Message { return new(pb.AttrRequest) },
-	AttrResType:     func() proto.Message { return new(pb.AttrResponse) },
-	ReaddirReqType:  func() proto.Message { return new(pb.ReaddirRequest) },
-	ReaddirResType:  func() proto.Message { return new(pb.ReaddirResponse) },
-	ReadlinkReqType: func() proto.Message { return new(pb.ReadlinkRequest) },
-	ReadlinkResType: func() proto.Message { return new(pb.ReadlinkResponse) },
+func addRPC(req, res proto.Message) {
+	if req != nil {
+		messageFromType[maxPacketType+0] = func() proto.Message { return proto.Clone(req) }
+	}
+	if res != nil {
+		messageFromType[maxPacketType+1] = func() proto.Message { return proto.Clone(res) }
+	}
+	maxPacketType += 2
+}
+
+func init() {
+	// Warning: order matters here. Don't re-order, insert, or delete
+	// items.
+	//
+	// Only append things to the end. If you have to delete, replace
+	// with nil, nil instead.
+	addRPC(&pb.AttrRequest{}, &pb.AttrResponse{})
+	addRPC(&pb.ReaddirRequest{}, &pb.ReaddirResponse{})
+	addRPC(&pb.ReadlinkRequest{}, &pb.ReadlinkResponse{})
+	addRPC(&pb.OpenRequest{}, &pb.OpenResponse{})
+	addRPC(&pb.CreateRequest{}, &pb.CreateResponse{})
+	addRPC(&pb.ReadRequest{}, &pb.ReadResponse{})
+	addRPC(&pb.WriteRequest{}, &pb.WriteResponse{})
+	addRPC(&pb.ChmodRequest{}, &pb.ChmodResponse{})
+	addRPC(&pb.ChownRequest{}, &pb.ChownResponse{})
+	addRPC(&pb.TruncateRequest{}, &pb.TruncateResponse{})
+	addRPC(&pb.UtimeRequest{}, &pb.UtimeResponse{})
+	addRPC(&pb.LinkRequest{}, &pb.LinkResponse{})
+	addRPC(&pb.SymlinkRequest{}, &pb.SymlinkResponse{})
+	addRPC(&pb.MkdirRequest{}, &pb.MkdirResponse{})
+	addRPC(&pb.RenameRequest{}, &pb.RenameResponse{})
+	addRPC(&pb.RmdirRequest{}, &pb.RmdirResponse{})
+	addRPC(&pb.UnlinkRequest{}, &pb.UnlinkResponse{})
+	addRPC(&pb.MknodRequest{}, &pb.MknodResponse{})
 }
 
 var packetTypeFromMessage = map[reflect.Type]PacketType{}
