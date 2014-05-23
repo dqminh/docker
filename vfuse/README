@@ -2,4 +2,29 @@ This is a FUSE server for dockerd (Linux-only) that implements its
 filesystem by proxying all the FUSE filesystem operations to a docker
 client (Mac, Windows, Linux).
 
-See https://github.com/dotcloud/docker/issues/4023
+Requirements:
+
+* Developing on a Linux machine
+* FUSE installed and working for your user and fusermount in PATH
+* go-fuse installed https://github.com/hanwen/go-fuse
+
+For history see https://github.com/dotcloud/docker/issues/4023
+
+
+* pick an operation from http://godoc.org/github.com/hanwen/go-fuse/fuse/pathfs#FileSystem
+* Ensure an issue exists in https://github.com/bradfitz/docker/issues and isn't being worked on.
+* write two protocol buffer messages in the "pb" directory in "pb.proto".
+* run "make" in that "pb" directory
+* Validate that the frame type exists for the request/response in "frame.go"
+* write a test in all_test.go
+* implement the server side in server.go.
+* implement the client side (owning the filesystem) in client.go.
+
+So far we have GetAttr (stat), Readlink, and OpenDir (readdirnames / readdir).
+
+These should be trivial: Chmod, Chown, Utimens, Truncate, Link, Mkdir, Rename, Rmdir, Unlink, and Symlink.
+
+Mknod will require mknod_darwin.go, mknod_linux.go, mknod_windows.go, etc files, since the standard library's pkg/os doesn't do some of that stuff.
+We can get ignore xattrs for now.
+
+bradfitz will handle Open, Create, and their Read/Write, since those will be a little different. But I'll take volunteers for any of the others above.
