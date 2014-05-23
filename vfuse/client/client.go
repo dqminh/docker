@@ -43,6 +43,8 @@ type Server struct {
 	c   *vfuse.Client
 }
 
+var errRO = &pb.Error{ReadOnly: proto.Bool(true)}
+
 func NewVolume(root string, writable bool) *Volume {
 	return &Volume{
 		Root:     root,
@@ -194,11 +196,11 @@ func (s *Server) handleReadlinkRequest(req *pb.ReadlinkRequest) (proto.Message, 
 }
 
 func (s *Server) handleChmodRequest(req *pb.ChmodRequest) (proto.Message, error) {
-	err := os.Chmod(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())), os.FileMode(req.GetMode()))
-	res := new(pb.ChmodResponse)
-	if err != nil {
-		res.Err = mapError(err)
-		return res, nil
+	if !s.vol.Writable {
+		return &pb.ChmodResponse{Err: errRO}, nil
 	}
-	return res, nil
+	err := os.Chmod(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())), os.FileMode(req.GetMode()))
+	return &pb.ChmodResponse{
+		Err: mapError(err),
+	}, nil
 }

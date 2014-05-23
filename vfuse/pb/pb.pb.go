@@ -62,6 +62,7 @@ var _ = math.Inf
 type Error struct {
 	NotExist         *bool   `protobuf:"varint,1,opt,name=not_exist" json:"not_exist,omitempty"`
 	Other            *string `protobuf:"bytes,2,opt,name=other" json:"other,omitempty"`
+	ReadOnly         *bool   `protobuf:"varint,3,opt,name=read_only" json:"read_only,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
 
@@ -81,6 +82,13 @@ func (m *Error) GetOther() string {
 		return *m.Other
 	}
 	return ""
+}
+
+func (m *Error) GetReadOnly() bool {
+	if m != nil && m.ReadOnly != nil {
+		return *m.ReadOnly
+	}
+	return false
 }
 
 type AttrRequest struct {

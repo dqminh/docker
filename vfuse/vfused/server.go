@@ -195,6 +195,9 @@ func fuseError(err *pb.Error) fuse.Status {
 	if err.GetNotExist() {
 		return fuse.ENOENT
 	}
+	if err.GetReadOnly() {
+		return fuse.EROFS
+	}
 	// TODO: more
 	return fuse.EIO
 }

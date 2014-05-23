@@ -4,6 +4,7 @@ message Error {
 	// Only one may be set.
 	optional bool not_exist = 1;
 	optional string other = 2;
+	optional bool read_only = 3;
 }
 
 message AttrRequest {
