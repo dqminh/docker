@@ -179,6 +179,16 @@ func (s *Server) handleAttrRequest(req *pb.AttrRequest) (proto.Message, error) {
 	return res, nil
 }
 
+func (s *Server) handleChmodRequest(req *pb.ChmodRequest) (proto.Message, error) {
+	if !s.vol.Writable {
+		return &pb.ChmodResponse{Err: errRO}, nil
+	}
+	err := os.Chmod(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())), os.FileMode(req.GetMode()))
+	return &pb.ChmodResponse{
+		Err: mapError(err),
+	}, nil
+}
+
 func (s *Server) handleCloseRequest(req *pb.CloseRequest) (proto.Message, error) {
 	res := &pb.CloseResponse{}
 	h := req.GetHandle()
@@ -196,6 +206,26 @@ func (s *Server) handleCloseRequest(req *pb.CloseRequest) (proto.Message, error)
 		res.Err = &pb.Error{Other: proto.String(err)}
 	}
 	return res, nil
+}
+
+func (s *Server) handleMkdirRequest(req *pb.MkdirRequest) (proto.Message, error) {
+	if !s.vol.Writable {
+		return &pb.MkdirResponse{Err: errRO}, nil
+	}
+	err := os.Mkdir(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())), os.FileMode(req.GetMode()))
+	return &pb.MkdirResponse{
+		Err: mapError(err),
+	}, nil
+}
+
+func (s *Server) handleOpenRequest(req *pb.OpenRequest) (proto.Message, error) {
+	// TODO: look at flags and return errRO earlier, instead of at the write later.
+	// TODO: look at flags at all, and use OpenFile
+	f, err := os.Open(req.GetName())
+	if err != nil {
+		return &pb.OpenResponse{Err: mapError(err)}, nil
+	}
+	return &pb.OpenResponse{Handle: proto.Uint64(s.vol.newHandle(f))}, nil
 }
 
 func (s *Server) handleReadRequest(req *pb.ReadRequest) (proto.Message, error) {
@@ -256,36 +286,6 @@ func (s *Server) handleReadlinkRequest(req *pb.ReadlinkRequest) (proto.Message, 
 	}
 	res.Target = &target
 	return res, nil
-}
-
-func (s *Server) handleChmodRequest(req *pb.ChmodRequest) (proto.Message, error) {
-	if !s.vol.Writable {
-		return &pb.ChmodResponse{Err: errRO}, nil
-	}
-	err := os.Chmod(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())), os.FileMode(req.GetMode()))
-	return &pb.ChmodResponse{
-		Err: mapError(err),
-	}, nil
-}
-
-func (s *Server) handleMkdirRequest(req *pb.MkdirRequest) (proto.Message, error) {
-	if !s.vol.Writable {
-		return &pb.MkdirResponse{Err: errRO}, nil
-	}
-	err := os.Mkdir(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())), os.FileMode(req.GetMode()))
-	return &pb.MkdirResponse{
-		Err: mapError(err),
-	}, nil
-}
-
-func (s *Server) handleOpenRequest(req *pb.OpenRequest) (proto.Message, error) {
-	// TODO: look at flags and return errRO earlier, instead of at the write later.
-	// TODO: look at flags at all, and use OpenFile
-	f, err := os.Open(req.GetName())
-	if err != nil {
-		return &pb.OpenResponse{Err: mapError(err)}, nil
-	}
-	return &pb.OpenResponse{Handle: proto.Uint64(s.vol.newHandle(f))}, nil
 }
 
 func (s *Server) handleRenameRequest(req *pb.RenameRequest) (proto.Message, error) {

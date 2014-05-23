@@ -82,6 +82,20 @@ func main() {
 	log.Printf("Unmounted, quitting.")
 }
 
+func fuseError(err *pb.Error) fuse.Status {
+	if err == nil {
+		return fuse.OK
+	}
+	if err.GetNotExist() {
+		return fuse.ENOENT
+	}
+	if err.GetReadOnly() {
+		return fuse.EROFS
+	}
+	// TODO: more
+	return fuse.EIO
+}
+
 type FS struct {
 	pathfs.FileSystem
 	ln net.Listener
@@ -93,6 +107,14 @@ type FS struct {
 	mu     sync.Mutex // guards the following fields
 	nextid uint64
 	res    map[uint64]chan<- proto.Message
+}
+
+func NewFS(ln net.Listener) *FS {
+	return &FS{
+		FileSystem: pathfs.NewDefaultFileSystem(),
+		ln:         ln,
+		res:        make(map[uint64]chan<- proto.Message),
+	}
 }
 
 func (fs *FS) getClient() {
@@ -133,26 +155,99 @@ func (fs *FS) nextID() (uint64, <-chan proto.Message) {
 	return id, c
 }
 
-func NewFS(ln net.Listener) *FS {
-	return &FS{
-		FileSystem: pathfs.NewDefaultFileSystem(),
-		ln:         ln,
-		res:        make(map[uint64]chan<- proto.Message),
+func (fs *FS) readFromClient() {
+	for {
+		p, err := fs.vc.ReadPacket()
+		if err != nil {
+			log.Fatalf("server: client disconnected or something: %v", err)
+		}
+		id := p.Header.ID
+		fs.mu.Lock()
+		resc, ok := fs.res[id]
+		if ok {
+			fs.forgetRequestLocked(id)
+		}
+		fs.mu.Unlock()
+		if !ok {
+			log.Fatalf("Client sent bogus packet we didn't ask for")
+		}
+		resc <- p.Body
 	}
 }
 
-func (fs *FS) StatFs(name string) *fuse.StatfsOut {
-	vlogf("fs.StatFs(%q)", name)
-	out := new(fuse.StatfsOut)
-	// TODO(bradfitz): make up some stuff for now. Do this properly later
-	// with a new packet type to the client.
-	out.Bsize = 1024
-	out.Blocks = 1e6
-	out.Bfree = out.Blocks / 2
-	out.Bavail = out.Blocks / 2
-	out.Files = 1e3
-	out.Ffree = 1e3 - 2
-	return out
+func (fs *FS) forgetRequestLocked(id uint64) {
+	delete(fs.res, id)
+}
+
+func (fs *FS) Chmod(name string, mode uint32, context *fuse.Context) fuse.Status {
+	vlogf("fs.Chmod(%q)", name)
+	resc, err := fs.sendPacket(&pb.ChmodRequest{
+		Name: &name,
+		Mode: &mode,
+	})
+	if err != nil {
+		return fuse.EIO
+	}
+	res, ok := (<-resc).(*pb.ChmodResponse)
+	if !ok {
+		vlogf("fs.Chmod(%q) = EIO because wrong type", name)
+		return fuse.EIO
+	}
+	if res.Err != nil {
+		return fuseError(res.Err)
+	}
+	return fuse.OK
+}
+
+func (fs *FS) GetAttr(name string, context *fuse.Context) (*fuse.Attr, fuse.Status) {
+	vlogf("fs.GetAttr(%q)", name)
+
+	resc, err := fs.sendPacket(&pb.AttrRequest{
+		Name: &name,
+	})
+	if err != nil {
+		return nil, fuse.EIO
+	}
+	resi := <-resc
+	vlogf("fs.GetAttr(%q) read response %T, %v", name, resi, resi)
+	res, ok := resi.(*pb.AttrResponse)
+	if !ok {
+		vlogf("fs.GetAttr(%q) = EIO because wrong type", name)
+		return nil, fuse.EIO
+	}
+	if res.Err != nil {
+		return nil, fuseError(res.Err)
+	}
+	attr := res.Attr
+	if attr == nil {
+		vlogf("fs.GetAttr(%q) = EIO because nil Attr", name)
+		return nil, fuse.EIO
+	}
+	fattr := &fuse.Attr{
+		Size:    attr.GetSize(),
+		Mode:    attr.GetMode(),
+		Nlink:   1,
+		Blksize: 1024,
+		Blocks:  attr.GetSize() / 1024,
+	}
+	vlogf("fs.GetAttr(%q) = OK: %+v", name, fattr)
+	return fattr, fuse.OK
+}
+
+func (fs *FS) Mkdir(name string, mode uint32, context *fuse.Context) fuse.Status {
+	vlogf("fs.Mkdir(%q, %o)", name, mode)
+	resc, err := fs.sendPacket(&pb.MkdirRequest{
+		Name: &name,
+		Mode: &mode,
+	})
+	if err != nil {
+		return fuse.EIO
+	}
+	res, ok := (<-resc).(*pb.MkdirResponse)
+	if !ok {
+		vlogf("fs.Mkdir(%q) = EIO because wrong type", name)
+	}
+	return fuseError(res.Err)
 }
 
 func (fs *FS) Open(name string, flags uint32, context *fuse.Context) (nodefs.File, fuse.Status) {
@@ -206,20 +301,6 @@ func (fs *FS) OpenDir(name string, context *fuse.Context) (stream []fuse.DirEntr
 	return stream, fuseError(res.Err)
 }
 
-func fuseError(err *pb.Error) fuse.Status {
-	if err == nil {
-		return fuse.OK
-	}
-	if err.GetNotExist() {
-		return fuse.ENOENT
-	}
-	if err.GetReadOnly() {
-		return fuse.EROFS
-	}
-	// TODO: more
-	return fuse.EIO
-}
-
 func (fs *FS) Readlink(name string, context *fuse.Context) (string, fuse.Status) {
 	vlogf("fs.Readlink(%q)", name)
 	resc, err := fs.sendPacket(&pb.ReadlinkRequest{
@@ -239,77 +320,6 @@ func (fs *FS) Readlink(name string, context *fuse.Context) (string, fuse.Status)
 	return res.GetTarget(), fuse.OK
 }
 
-func (fs *FS) GetAttr(name string, context *fuse.Context) (*fuse.Attr, fuse.Status) {
-	vlogf("fs.GetAttr(%q)", name)
-
-	resc, err := fs.sendPacket(&pb.AttrRequest{
-		Name: &name,
-	})
-	if err != nil {
-		return nil, fuse.EIO
-	}
-	resi := <-resc
-	vlogf("fs.GetAttr(%q) read response %T, %v", name, resi, resi)
-	res, ok := resi.(*pb.AttrResponse)
-	if !ok {
-		vlogf("fs.GetAttr(%q) = EIO because wrong type", name)
-		return nil, fuse.EIO
-	}
-	if res.Err != nil {
-		return nil, fuseError(res.Err)
-	}
-	attr := res.Attr
-	if attr == nil {
-		vlogf("fs.GetAttr(%q) = EIO because nil Attr", name)
-		return nil, fuse.EIO
-	}
-	fattr := &fuse.Attr{
-		Size:    attr.GetSize(),
-		Mode:    attr.GetMode(),
-		Nlink:   1,
-		Blksize: 1024,
-		Blocks:  attr.GetSize() / 1024,
-	}
-	vlogf("fs.GetAttr(%q) = OK: %+v", name, fattr)
-	return fattr, fuse.OK
-}
-
-func (fs *FS) Chmod(name string, mode uint32, context *fuse.Context) fuse.Status {
-	vlogf("fs.Chmod(%q)", name)
-	resc, err := fs.sendPacket(&pb.ChmodRequest{
-		Name: &name,
-		Mode: &mode,
-	})
-	if err != nil {
-		return fuse.EIO
-	}
-	res, ok := (<-resc).(*pb.ChmodResponse)
-	if !ok {
-		vlogf("fs.Chmod(%q) = EIO because wrong type", name)
-		return fuse.EIO
-	}
-	if res.Err != nil {
-		return fuseError(res.Err)
-	}
-	return fuse.OK
-}
-
-func (fs *FS) Mkdir(name string, mode uint32, context *fuse.Context) fuse.Status {
-	vlogf("fs.Mkdir(%q, %o)", name, mode)
-	resc, err := fs.sendPacket(&pb.MkdirRequest{
-		Name: &name,
-		Mode: &mode,
-	})
-	if err != nil {
-		return fuse.EIO
-	}
-	res, ok := (<-resc).(*pb.MkdirResponse)
-	if !ok {
-		vlogf("fs.Mkdir(%q) = EIO because wrong type", name)
-	}
-	return fuseError(res.Err)
-}
-
 func (fs *FS) Rename(name string, target string, context *fuse.Context) fuse.Status {
 	vlogf("fs.Rename(%q, %q)", name, target)
 	resc, err := fs.sendPacket(&pb.RenameRequest{
@@ -327,36 +337,18 @@ func (fs *FS) Rename(name string, target string, context *fuse.Context) fuse.Sta
 	return fuseError(res.Err)
 }
 
-//SetAttr(input *SetAttrIn, out *AttrOut) (code Status)
-
-func (fs *FS) readFromClient() {
-	for {
-		p, err := fs.vc.ReadPacket()
-		if err != nil {
-			log.Fatalf("server: client disconnected or something: %v", err)
-		}
-		id := p.Header.ID
-		fs.mu.Lock()
-		resc, ok := fs.res[id]
-		if ok {
-			fs.forgetRequestLocked(id)
-		}
-		fs.mu.Unlock()
-		if !ok {
-			log.Fatalf("Client sent bogus packet we didn't ask for")
-		}
-		resc <- p.Body
-	}
-}
-
-func (fs *FS) forgetRequest(id uint64) {
-	fs.mu.Lock()
-	fs.forgetRequestLocked(id)
-	fs.mu.Unlock()
-}
-
-func (fs *FS) forgetRequestLocked(id uint64) {
-	delete(fs.res, id)
+func (fs *FS) StatFs(name string) *fuse.StatfsOut {
+	vlogf("fs.StatFs(%q)", name)
+	out := new(fuse.StatfsOut)
+	// TODO(bradfitz): make up some stuff for now. Do this properly later
+	// with a new packet type to the client.
+	out.Bsize = 1024
+	out.Blocks = 1e6
+	out.Bfree = out.Blocks / 2
+	out.Bavail = out.Blocks / 2
+	out.Files = 1e3
+	out.Ffree = 1e3 - 2
+	return out
 }
 
 // file implements http://godoc.org/github.com/hanwen/go-fuse/fuse/nodefs#File
