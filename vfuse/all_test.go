@@ -448,3 +448,21 @@ dirwalk/sub/2.txt = -rw-r----- (size 7)
 		t.Errorf("Walk got:\n%s\n\nWant:\n%s", got.String(), want)
 	}
 }
+
+// Chmod file
+func init() { addWorldTest("TestChmod") }
+func TestChmod(t *testing.T) {
+	w := getWorld(t)
+	defer w.release()
+
+	w.writeFile(w.cpath("chmod/1.txt"), "test file")
+
+	os.Chmod(w.fpath("chmod/1.txt"), 0777)
+	st, err := os.Stat(w.cpath("chmod/1.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Mode().String() != "-rwxrwxrwx" {
+		t.Fatalf("Mode %s, expected %s", st.Mode(), os.FileMode(0777))
+	}
+}

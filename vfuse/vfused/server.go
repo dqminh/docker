@@ -253,6 +253,26 @@ func (fs *FS) GetAttr(name string, context *fuse.Context) (*fuse.Attr, fuse.Stat
 	return fattr, fuse.OK
 }
 
+func (fs *FS) Chmod(name string, mode uint32, context *fuse.Context) fuse.Status {
+	vlogf("fs.Chmod(%q)", name)
+	resc, err := fs.sendPacket(&pb.ChmodRequest{
+		Name: &name,
+		Mode: &mode,
+	})
+	if err != nil {
+		return fuse.EIO
+	}
+	res, ok := (<-resc).(*pb.ChmodResponse)
+	if !ok {
+		vlogf("fs.Chmod(%q) = EIO because wrong type", name)
+		return fuse.EIO
+	}
+	if res.Err != nil {
+		return fuseError(res.Err)
+	}
+	return fuse.OK
+}
+
 //SetAttr(input *SetAttrIn, out *AttrOut) (code Status)
 
 func (fs *FS) readFromClient() {

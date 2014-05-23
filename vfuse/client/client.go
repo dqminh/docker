@@ -94,6 +94,8 @@ func (s *Server) Run() {
 			res, err = s.handleReaddirRequest(m)
 		case *pb.ReadlinkRequest:
 			res, err = s.handleReadlinkRequest(m)
+		case *pb.ChmodRequest:
+			res, err = s.handleChmodRequest(m)
 		default:
 			log.Fatalf("client: unhandled request type %T", p.Body)
 		}
@@ -135,7 +137,7 @@ func mapMode(m os.FileMode) uint32 {
 		mode |= S_IFDIR
 	} else if m.IsRegular() {
 		mode |= S_IFREG
-	} else if m & os.ModeSymlink != 0 {
+	} else if m&os.ModeSymlink != 0 {
 		mode |= S_IFLNK
 	}
 	// TODO: more
@@ -188,5 +190,15 @@ func (s *Server) handleReadlinkRequest(req *pb.ReadlinkRequest) (proto.Message, 
 		return res, nil
 	}
 	res.Target = &target
+	return res, nil
+}
+
+func (s *Server) handleChmodRequest(req *pb.ChmodRequest) (proto.Message, error) {
+	err := os.Chmod(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())), os.FileMode(req.GetMode()))
+	res := new(pb.ChmodResponse)
+	if err != nil {
+		res.Err = mapError(err)
+		return res, nil
+	}
 	return res, nil
 }
