@@ -55,10 +55,12 @@ It has these top-level messages:
 package pb
 
 import proto "code.google.com/p/goprotobuf/proto"
+import json "encoding/json"
 import math "math"
 
-// Reference imports to suppress errors if they are not otherwise used.
+// Reference proto, json, and math imports to suppress error if they are not otherwise used.
 var _ = proto.Marshal
+var _ = &json.SyntaxError{}
 var _ = math.Inf
 
 type Error struct {
@@ -590,20 +592,44 @@ func (m *SymlinkResponse) String() string { return proto.CompactTextString(m) }
 func (*SymlinkResponse) ProtoMessage()    {}
 
 type MkdirRequest struct {
-	XXX_unrecognized []byte `json:"-"`
+	Name             *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
+	Mode             *uint32 `protobuf:"varint,2,opt,name=mode" json:"mode,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
 }
 
 func (m *MkdirRequest) Reset()         { *m = MkdirRequest{} }
 func (m *MkdirRequest) String() string { return proto.CompactTextString(m) }
 func (*MkdirRequest) ProtoMessage()    {}
 
+func (m *MkdirRequest) GetName() string {
+	if m != nil && m.Name != nil {
+		return *m.Name
+	}
+	return ""
+}
+
+func (m *MkdirRequest) GetMode() uint32 {
+	if m != nil && m.Mode != nil {
+		return *m.Mode
+	}
+	return 0
+}
+
 type MkdirResponse struct {
+	Err              *Error `protobuf:"bytes,1,opt,name=err" json:"err,omitempty"`
 	XXX_unrecognized []byte `json:"-"`
 }
 
 func (m *MkdirResponse) Reset()         { *m = MkdirResponse{} }
 func (m *MkdirResponse) String() string { return proto.CompactTextString(m) }
 func (*MkdirResponse) ProtoMessage()    {}
+
+func (m *MkdirResponse) GetErr() *Error {
+	if m != nil {
+		return m.Err
+	}
+	return nil
+}
 
 type MknodRequest struct {
 	XXX_unrecognized []byte `json:"-"`

@@ -276,6 +276,26 @@ func (fs *FS) Chmod(name string, mode uint32, context *fuse.Context) fuse.Status
 	return fuse.OK
 }
 
+func (fs *FS) Mkdir(name string, mode uint32, context *fuse.Context) fuse.Status {
+	vlogf("fs.Mkdir(%q, %o)", name, mode)
+	resc, err := fs.sendPacket(&pb.MkdirRequest{
+		Name: &name,
+		Mode: &mode,
+	})
+	if err != nil {
+		return fuse.EIO
+	}
+	res, ok := (<-resc).(*pb.MkdirResponse)
+	if !ok {
+		vlogf("fs.Mkdir(%q) = EIO because wrong type", name)
+		return fuse.EIO
+	}
+	if res.Err != nil {
+		return fuseError(res.Err)
+	}
+	return fuse.OK
+}
+
 //SetAttr(input *SetAttrIn, out *AttrOut) (code Status)
 
 func (fs *FS) readFromClient() {

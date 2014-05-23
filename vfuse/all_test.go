@@ -499,3 +499,28 @@ func TestOpenRead(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// mkdir directory
+func init() { addWorldTest("TestMkdir") }
+func TestMkdir(t *testing.T) {
+	w := getWorld(t)
+	defer w.release()
+
+	fpath := w.fpath("mkdir-new_dir")
+	err := os.Mkdir(fpath, 0700)
+	if err != nil {
+		t.Fatalf("Failed to create directory %q: %v", fpath, err)
+	}
+
+	cpath := w.cpath("mkdir-new_dir")
+	fi, err := os.Stat(cpath)
+	if err != nil {
+		t.Fatal("Failed to stat directory %q: %v", cpath, err)
+	}
+	if !fi.IsDir() {
+		t.Fatalf("%q is not a directory", cpath)
+	}
+	if fi.Mode().String() != "drwx------" {
+		t.Fatalf("Mode %s, expected %s", fi.Mode(), os.FileMode(0700))
+	}
+}

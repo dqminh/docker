@@ -131,11 +131,12 @@ message SymlinkResponse {
 }
 
 message MkdirRequest {
-//...
+	optional string name = 1;
+	optional uint32 mode = 2;
 }
 
 message MkdirResponse {
-//...
+	optional Error err = 1;
 }
 
 message MknodRequest {

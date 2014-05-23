@@ -98,6 +98,8 @@ func (s *Server) Run() {
 			res, err = s.handleReadlinkRequest(m)
 		case *pb.ChmodRequest:
 			res, err = s.handleChmodRequest(m)
+		case *pb.MkdirRequest:
+			res, err = s.handleMkdirRequest(m)
 		default:
 			log.Fatalf("client: unhandled request type %T", p.Body)
 		}
@@ -201,6 +203,16 @@ func (s *Server) handleChmodRequest(req *pb.ChmodRequest) (proto.Message, error)
 	}
 	err := os.Chmod(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())), os.FileMode(req.GetMode()))
 	return &pb.ChmodResponse{
+		Err: mapError(err),
+	}, nil
+}
+
+func (s *Server) handleMkdirRequest(req *pb.MkdirRequest) (proto.Message, error) {
+	if !s.vol.Writable {
+		return &pb.MkdirResponse{Err: errRO}, nil
+	}
+	err := os.Mkdir(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())), os.FileMode(req.GetMode()))
+	return &pb.MkdirResponse{
 		Err: mapError(err),
 	}, nil
 }
