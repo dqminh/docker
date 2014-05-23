@@ -55,6 +55,7 @@ func init() {
 	addRPC(&pb.RmdirRequest{}, &pb.RmdirResponse{})
 	addRPC(&pb.UnlinkRequest{}, &pb.UnlinkResponse{})
 	addRPC(&pb.MknodRequest{}, &pb.MknodResponse{})
+	addRPC(&pb.CloseRequest{}, &pb.CloseResponse{})
 }
 
 var packetTypeFromMessage = map[reflect.Type]PacketType{}

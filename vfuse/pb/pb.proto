@@ -192,11 +192,31 @@ message CreateResponse {
 }
 
 message ReadRequest {
+	required uint64 handle = 1;
+	required uint64 offset = 2;
+	required uint64 size = 3; // probably also a max of uint32
 }
+
 message ReadResponse {
+	optional Error err = 1;
+	optional bytes data = 2;
 }
 
 message WriteRequest {
+	required uint64 handle = 1;
+	required uint64 offset = 2;
+	optional bytes data = 3;
 }
+
 message WriteResponse {
+	optional Error err = 1;
+	optional uint64 written = 2; // note: is uint32 in FUSE API?
+}
+
+message CloseRequest {
+	required uint64 handle = 1;
+}
+
+message CloseResponse {
+	optional Error err = 1;
 }

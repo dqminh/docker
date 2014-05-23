@@ -49,6 +49,8 @@ It has these top-level messages:
 	ReadResponse
 	WriteRequest
 	WriteResponse
+	CloseRequest
+	CloseResponse
 */
 package pb
 
@@ -788,14 +790,40 @@ func (m *CreateResponse) GetHandle() uint64 {
 }
 
 type ReadRequest struct {
-	XXX_unrecognized []byte `json:"-"`
+	Handle           *uint64 `protobuf:"varint,1,req,name=handle" json:"handle,omitempty"`
+	Offset           *uint64 `protobuf:"varint,2,req,name=offset" json:"offset,omitempty"`
+	Size             *uint64 `protobuf:"varint,3,req,name=size" json:"size,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
 }
 
 func (m *ReadRequest) Reset()         { *m = ReadRequest{} }
 func (m *ReadRequest) String() string { return proto.CompactTextString(m) }
 func (*ReadRequest) ProtoMessage()    {}
 
+func (m *ReadRequest) GetHandle() uint64 {
+	if m != nil && m.Handle != nil {
+		return *m.Handle
+	}
+	return 0
+}
+
+func (m *ReadRequest) GetOffset() uint64 {
+	if m != nil && m.Offset != nil {
+		return *m.Offset
+	}
+	return 0
+}
+
+func (m *ReadRequest) GetSize() uint64 {
+	if m != nil && m.Size != nil {
+		return *m.Size
+	}
+	return 0
+}
+
 type ReadResponse struct {
+	Err              *Error `protobuf:"bytes,1,opt,name=err" json:"err,omitempty"`
+	Data             []byte `protobuf:"bytes,2,opt,name=data" json:"data,omitempty"`
 	XXX_unrecognized []byte `json:"-"`
 }
 
@@ -803,21 +831,107 @@ func (m *ReadResponse) Reset()         { *m = ReadResponse{} }
 func (m *ReadResponse) String() string { return proto.CompactTextString(m) }
 func (*ReadResponse) ProtoMessage()    {}
 
+func (m *ReadResponse) GetErr() *Error {
+	if m != nil {
+		return m.Err
+	}
+	return nil
+}
+
+func (m *ReadResponse) GetData() []byte {
+	if m != nil {
+		return m.Data
+	}
+	return nil
+}
+
 type WriteRequest struct {
-	XXX_unrecognized []byte `json:"-"`
+	Handle           *uint64 `protobuf:"varint,1,req,name=handle" json:"handle,omitempty"`
+	Offset           *uint64 `protobuf:"varint,2,req,name=offset" json:"offset,omitempty"`
+	Data             []byte  `protobuf:"bytes,3,opt,name=data" json:"data,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
 }
 
 func (m *WriteRequest) Reset()         { *m = WriteRequest{} }
 func (m *WriteRequest) String() string { return proto.CompactTextString(m) }
 func (*WriteRequest) ProtoMessage()    {}
 
+func (m *WriteRequest) GetHandle() uint64 {
+	if m != nil && m.Handle != nil {
+		return *m.Handle
+	}
+	return 0
+}
+
+func (m *WriteRequest) GetOffset() uint64 {
+	if m != nil && m.Offset != nil {
+		return *m.Offset
+	}
+	return 0
+}
+
+func (m *WriteRequest) GetData() []byte {
+	if m != nil {
+		return m.Data
+	}
+	return nil
+}
+
 type WriteResponse struct {
-	XXX_unrecognized []byte `json:"-"`
+	Err              *Error  `protobuf:"bytes,1,opt,name=err" json:"err,omitempty"`
+	Written          *uint64 `protobuf:"varint,2,opt,name=written" json:"written,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
 }
 
 func (m *WriteResponse) Reset()         { *m = WriteResponse{} }
 func (m *WriteResponse) String() string { return proto.CompactTextString(m) }
 func (*WriteResponse) ProtoMessage()    {}
+
+func (m *WriteResponse) GetErr() *Error {
+	if m != nil {
+		return m.Err
+	}
+	return nil
+}
+
+func (m *WriteResponse) GetWritten() uint64 {
+	if m != nil && m.Written != nil {
+		return *m.Written
+	}
+	return 0
+}
+
+type CloseRequest struct {
+	Handle           *uint64 `protobuf:"varint,1,req,name=handle" json:"handle,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *CloseRequest) Reset()         { *m = CloseRequest{} }
+func (m *CloseRequest) String() string { return proto.CompactTextString(m) }
+func (*CloseRequest) ProtoMessage()    {}
+
+func (m *CloseRequest) GetHandle() uint64 {
+	if m != nil && m.Handle != nil {
+		return *m.Handle
+	}
+	return 0
+}
+
+type CloseResponse struct {
+	Err              *Error `protobuf:"bytes,1,opt,name=err" json:"err,omitempty"`
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *CloseResponse) Reset()         { *m = CloseResponse{} }
+func (m *CloseResponse) String() string { return proto.CompactTextString(m) }
+func (*CloseResponse) ProtoMessage()    {}
+
+func (m *CloseResponse) GetErr() *Error {
+	if m != nil {
+		return m.Err
+	}
+	return nil
+}
 
 func init() {
 }
