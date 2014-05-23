@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/dotcloud/docker/vfuse"
 	"github.com/dotcloud/docker/vfuse/pb"
@@ -120,6 +121,8 @@ func (s *Server) Run() {
 			res, err = s.handleRmdirRequest(m)
 		case *pb.SymlinkRequest:
 			res, err = s.handleSymlinkRequest(m)
+		case *pb.UtimeRequest:
+			res, err = s.handleUtimeRequest(m)
 		default:
 			log.Fatalf("unhandled request type %T", p.Body)
 		}
@@ -319,6 +322,20 @@ func (s *Server) handleSymlinkRequest(req *pb.SymlinkRequest) (proto.Message, er
 	}
 	err := os.Symlink(req.GetValue(), filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())))
 	return &pb.SymlinkResponse{
+		Err: mapError(err),
+	}, nil
+}
+
+func (s *Server) handleUtimeRequest(req *pb.UtimeRequest) (proto.Message, error) {
+	if !s.vol.Writable {
+		return &pb.UtimeResponse{Err: errRO}, nil
+	}
+	at := req.GetAtime()
+	mt := req.GetMtime()
+	atime := time.Unix(at.GetSec(), int64(at.GetNsec()))
+	mtime := time.Unix(mt.GetSec(), int64(mt.GetNsec()))
+	err := os.Chtimes(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())), atime, mtime)
+	return &pb.UtimeResponse{
 		Err: mapError(err),
 	}, nil
 }

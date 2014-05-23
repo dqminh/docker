@@ -17,6 +17,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -462,7 +463,9 @@ func TestChmod(t *testing.T) {
 
 	w.writeFile(w.cpath("chmod/1.txt"), "test file")
 
-	os.Chmod(w.fpath("chmod/1.txt"), 0777)
+	if err := os.Chmod(w.fpath("chmod/1.txt"), 0777); err != nil {
+		t.Fatal(err)
+	}
 	st, err := os.Stat(w.cpath("chmod/1.txt"))
 	if err != nil {
 		t.Fatal(err)
@@ -701,5 +704,32 @@ func TestSymlinkDir(t *testing.T) {
 	}
 	if string(content) != "test file" {
 		t.Fatal("Wrong content read from symlinked dir, got %s, must be \"test file\"", content)
+	}
+}
+
+// Utime file
+func init() { addWorldTest("TestUtime") }
+func TestUtime(t *testing.T) {
+	w := getWorld(t)
+	defer w.release()
+
+	w.writeFile(w.cpath("utime/1.txt"), "test file")
+
+	atime := time.Unix(5, 4)
+	mtime := time.Unix(6, 7)
+	if err := os.Chtimes(w.fpath("utime/1.txt"), atime, mtime); err != nil {
+		t.Fatal(err)
+	}
+	st, err := os.Stat(w.cpath("utime/1.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.ModTime() != mtime {
+		t.Fatal(err)
+	}
+	stat := st.Sys().(*syscall.Stat_t)
+	natime := time.Unix(int64(stat.Atim.Sec), int64(stat.Atim.Nsec))
+	if atime != natime {
+		t.Fatalf("Expected atime %v, got %v", atime, natime)
 	}
 }

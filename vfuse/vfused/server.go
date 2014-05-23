@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/dotcloud/docker/vfuse/pb"
 
@@ -94,6 +95,12 @@ func fuseError(err *pb.Error) fuse.Status {
 	}
 	// TODO: more
 	return fuse.EIO
+}
+
+func pbTime(t *time.Time) *pb.Time {
+	sec := t.Unix()
+	nsec := int32(t.Nanosecond())
+	return &pb.Time{Sec: &sec, Nsec: &nsec}
 }
 
 type FS struct {
@@ -193,10 +200,7 @@ func (fs *FS) Chmod(name string, mode uint32, context *fuse.Context) fuse.Status
 		vlogf("fs.Chmod(%q) = EIO because wrong type", name)
 		return fuse.EIO
 	}
-	if res.Err != nil {
-		return fuseError(res.Err)
-	}
-	return fuse.OK
+	return fuseError(res.Err)
 }
 
 func (fs *FS) GetAttr(name string, context *fuse.Context) (*fuse.Attr, fuse.Status) {
@@ -364,6 +368,24 @@ func (fs *FS) Symlink(value string, linkName string, context *fuse.Context) fuse
 	res, ok := (<-resc).(*pb.SymlinkResponse)
 	if !ok {
 		vlogf("fs.Symlink(%q, %q) = EIO", value, linkName)
+		return fuse.EIO
+	}
+	return fuseError(res.Err)
+}
+
+func (fs *FS) Utimens(name string, atime *time.Time, mtime *time.Time, context *fuse.Context) fuse.Status {
+	vlogf("fs.Utimens(%q, atime: %v, mtime: %v)", name, atime, mtime)
+	resc, err := fs.sendPacket(&pb.UtimeRequest{
+		Name:  &name,
+		Atime: pbTime(atime),
+		Mtime: pbTime(mtime),
+	})
+	if err != nil {
+		return fuse.EIO
+	}
+	res, ok := (<-resc).(*pb.UtimeResponse)
+	if !ok {
+		vlogf("fs.Uitmens(%q, %v, %v) = EIO because wrong type", name, atime, mtime)
 		return fuse.EIO
 	}
 	return fuseError(res.Err)
