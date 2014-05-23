@@ -100,6 +100,8 @@ func (s *Server) Run() {
 			res, err = s.handleChmodRequest(m)
 		case *pb.MkdirRequest:
 			res, err = s.handleMkdirRequest(m)
+		case *pb.RenameRequest:
+			res, err = s.handleRenameRequest(m)
 		default:
 			log.Fatalf("client: unhandled request type %T", p.Body)
 		}
@@ -213,6 +215,17 @@ func (s *Server) handleMkdirRequest(req *pb.MkdirRequest) (proto.Message, error)
 	}
 	err := os.Mkdir(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())), os.FileMode(req.GetMode()))
 	return &pb.MkdirResponse{
+		Err: mapError(err),
+	}, nil
+}
+
+func (s *Server) handleRenameRequest(req *pb.RenameRequest) (proto.Message, error) {
+	if !s.vol.Writable {
+		return &pb.RenameResponse{Err: errRO}, nil
+	}
+	err := os.Rename(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())),
+		filepath.Join(s.vol.Root, filepath.FromSlash(req.GetTarget())))
+	return &pb.RenameResponse{
 		Err: mapError(err),
 	}, nil
 }

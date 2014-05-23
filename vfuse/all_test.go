@@ -524,3 +524,88 @@ func TestMkdir(t *testing.T) {
 		t.Fatalf("Mode %s, expected %s", fi.Mode(), os.FileMode(0700))
 	}
 }
+
+// Rename file
+func init() { addWorldTest("TestRename") }
+func TestRename(t *testing.T) {
+	w := getWorld(t)
+	defer w.release()
+
+	w.writeFile(w.cpath("rename/before.txt"), "test file")
+
+	base := w.fpath("rename")
+	err := os.Rename(filepath.Join(base, "before.txt"), filepath.Join(base, "after.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = os.Stat(w.cpath("rename/after.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Rename non-existing file
+func init() { addWorldTest("TestRenameNonExisting") }
+func TestRenameNonExisting(t *testing.T) {
+	w := getWorld(t)
+	defer w.release()
+
+	base := w.fpath("rename-non-existing")
+	os.Rename(filepath.Join(base, "does-not-exist.txt"), filepath.Join(base, "after.txt"))
+	if _, err := os.Lstat(w.cpath("rename-non-existing/after.txt")); !os.IsNotExist(err) {
+		t.Errorf("For non-existant file, want os.IsNotExist; got err = %v", err)
+	}
+}
+
+func init() { addWorldTest("TestRenameTargetExists") }
+func TestRenameTargetExists(t *testing.T) {
+	w := getWorld(t)
+	defer w.release()
+
+	w.writeFile(w.cpath("rename-target-exists/1.txt"), "test file")
+	w.writeFile(w.cpath("rename-target-exists/2.txt"), "test file 2")
+
+	err := os.Rename(w.fpath("rename-target-exists/1.txt"), w.fpath("rename-target-exists/2.txt"))
+	if err != nil {
+		t.Fatal("Expected rename to overwrite")
+	}
+	contents, err := ioutil.ReadFile(w.cpath("rename-target-exists/2.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(contents) != "test file" {
+		t.Errorf("Expected %q got %q", "test file", string(contents))
+	}
+}
+
+func init() { addWorldTest("TestRenameTargetDir") }
+func TestRenameTargetDir(t *testing.T) {
+	w := getWorld(t)
+	defer w.release()
+
+	w.writeFile(w.cpath("rename-target-dir/src/1.txt"), "test file")
+
+	err := os.Rename(w.fpath("rename-target-dir/src"), w.fpath("rename-target-dir/dest"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = os.Stat(w.cpath("rename-target-dir/dest/1.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func init() { addWorldTest("TestRenameTargetDirNonEmpty") }
+func TestRenameTargetDirNonEmpty(t *testing.T) {
+	w := getWorld(t)
+	defer w.release()
+
+	w.writeFile(w.cpath("rename-target-dir/src/1.txt"), "test file")
+	w.writeFile(w.cpath("rename-target-dir/dest/2.txt"), "test file 2")
+
+	err := os.Rename(w.fpath("rename-target-dir/src"), w.fpath("rename-target-dir/dest"))
+	// go fuse doesn't seem to have ENOTEMPTY we get an EIO.
+	if err == nil {
+		t.Fatal("Expected rename to fail")
+	}
+}

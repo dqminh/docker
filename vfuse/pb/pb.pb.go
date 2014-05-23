@@ -648,20 +648,44 @@ func (m *MknodResponse) String() string { return proto.CompactTextString(m) }
 func (*MknodResponse) ProtoMessage()    {}
 
 type RenameRequest struct {
-	XXX_unrecognized []byte `json:"-"`
+	Name             *string `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
+	Target           *string `protobuf:"bytes,2,req,name=target" json:"target,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
 }
 
 func (m *RenameRequest) Reset()         { *m = RenameRequest{} }
 func (m *RenameRequest) String() string { return proto.CompactTextString(m) }
 func (*RenameRequest) ProtoMessage()    {}
 
+func (m *RenameRequest) GetName() string {
+	if m != nil && m.Name != nil {
+		return *m.Name
+	}
+	return ""
+}
+
+func (m *RenameRequest) GetTarget() string {
+	if m != nil && m.Target != nil {
+		return *m.Target
+	}
+	return ""
+}
+
 type RenameResponse struct {
+	Err              *Error `protobuf:"bytes,1,opt,name=err" json:"err,omitempty"`
 	XXX_unrecognized []byte `json:"-"`
 }
 
 func (m *RenameResponse) Reset()         { *m = RenameResponse{} }
 func (m *RenameResponse) String() string { return proto.CompactTextString(m) }
 func (*RenameResponse) ProtoMessage()    {}
+
+func (m *RenameResponse) GetErr() *Error {
+	if m != nil {
+		return m.Err
+	}
+	return nil
+}
 
 type RmdirRequest struct {
 	XXX_unrecognized []byte `json:"-"`

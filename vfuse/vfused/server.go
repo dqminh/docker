@@ -288,12 +288,25 @@ func (fs *FS) Mkdir(name string, mode uint32, context *fuse.Context) fuse.Status
 	res, ok := (<-resc).(*pb.MkdirResponse)
 	if !ok {
 		vlogf("fs.Mkdir(%q) = EIO because wrong type", name)
+	}
+	return fuseError(res.Err)
+}
+
+func (fs *FS) Rename(name string, target string, context *fuse.Context) fuse.Status {
+	vlogf("fs.Rename(%q, %q)", name, target)
+	resc, err := fs.sendPacket(&pb.RenameRequest{
+		Name:   &name,
+		Target: &target,
+	})
+	if err != nil {
 		return fuse.EIO
 	}
-	if res.Err != nil {
-		return fuseError(res.Err)
+	res, ok := (<-resc).(*pb.RenameResponse)
+	if !ok {
+		vlogf("fs.Rename(%q, %q) = EIO", name, target)
+		return fuse.EIO
 	}
-	return fuse.OK
+	return fuseError(res.Err)
 }
 
 //SetAttr(input *SetAttrIn, out *AttrOut) (code Status)
