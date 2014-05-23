@@ -477,7 +477,6 @@ func init() { addWorldTest("TestOpenRead") }
 func TestOpenRead(t *testing.T) {
 	w := getWorld(t)
 	defer w.release()
-	knownBroken(t)
 
 	const contents = "Some test file"
 	w.writeFile(w.cpath("openread/f.txt"), contents)

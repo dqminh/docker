@@ -200,6 +200,7 @@ message ReadRequest {
 }
 
 message ReadResponse {
+	// One will be set:
 	optional Error err = 1;
 	optional bytes data = 2;
 }

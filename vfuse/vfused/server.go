@@ -155,9 +155,33 @@ func (fs *FS) StatFs(name string) *fuse.StatfsOut {
 	return out
 }
 
-func (fs *FS) Open(name string, flags uint32, context *fuse.Context) (file nodefs.File, code fuse.Status) {
+func (fs *FS) Open(name string, flags uint32, context *fuse.Context) (nodefs.File, fuse.Status) {
 	vlogf("fs.Open(%q, flags %d)", name, flags)
-	return nil, fuse.ENOSYS
+	resc, err := fs.sendPacket(&pb.OpenRequest{
+		Name:  &name,
+		Flags: &flags,
+	})
+	if err != nil {
+		return nil, fuse.EIO
+	}
+	res, ok := (<-resc).(*pb.OpenResponse)
+	if !ok {
+		return nil, fuse.EIO
+	}
+	if res.Err != nil {
+		return nil, fuseError(res.Err)
+	}
+	f := &file{
+		fs:        fs,
+		File:      nodefs.NewDefaultFile(), // dummy ops for everything
+		handle:    res.GetHandle(),
+		origName:  name,
+		origFlags: flags,
+	}
+	if f.handle == 0 {
+		return nil, fuse.EIO
+	}
+	return f, fuse.OK
 }
 
 func (fs *FS) OpenDir(name string, context *fuse.Context) (stream []fuse.DirEntry, code fuse.Status) {
@@ -172,12 +196,6 @@ func (fs *FS) OpenDir(name string, context *fuse.Context) (stream []fuse.DirEntr
 	if !ok {
 		return nil, fuse.EIO
 	}
-	if res.Err != nil {
-		if res.Err.GetNotExist() {
-			return nil, fuse.ENOENT
-		}
-		return nil, fuse.EIO // TODO: more specific error types?
-	}
 	stream = make([]fuse.DirEntry, len(res.Entry))
 	for i, ent := range res.Entry {
 		stream[i] = fuse.DirEntry{
@@ -185,7 +203,7 @@ func (fs *FS) OpenDir(name string, context *fuse.Context) (stream []fuse.DirEntr
 			Mode: ent.GetMode(),
 		}
 	}
-	return stream, fuse.OK
+	return stream, fuseError(res.Err)
 }
 
 func fuseError(err *pb.Error) fuse.Status {
@@ -339,4 +357,51 @@ func (fs *FS) forgetRequest(id uint64) {
 
 func (fs *FS) forgetRequestLocked(id uint64) {
 	delete(fs.res, id)
+}
+
+// file implements http://godoc.org/github.com/hanwen/go-fuse/fuse/nodefs#File
+//
+// It represents an open file on the filesystem host, identified by
+// the filesystem host-assigned handle.
+//
+// Actually *file implements nodefs.File. The file struct isn't mutated, though.
+type file struct {
+	nodefs.File
+	fs        *FS
+	handle    uint64
+	origName  string // just for debugging
+	origFlags uint32 // just for debugging
+}
+
+func (f *file) Flush() fuse.Status {
+	resc, err := f.fs.sendPacket(&pb.CloseRequest{
+		Handle: &f.handle,
+	})
+	if err != nil {
+		return fuse.EIO
+	}
+	res, ok := (<-resc).(*pb.CloseResponse)
+	if !ok {
+		vlogf("fs.Close = EIO due to wrong type")
+		return fuse.EIO
+	}
+	return fuseError(res.Err)
+}
+
+func (f *file) Read(dest []byte, off int64) (fuse.ReadResult, fuse.Status) {
+	vlogf("fs.Read(offset=%d, size=%d)", off, len(dest))
+	resc, err := f.fs.sendPacket(&pb.ReadRequest{
+		Handle: &f.handle,
+		Offset: proto.Uint64(uint64(off)),
+		Size:   proto.Uint64(uint64(len(dest))),
+	})
+	if err != nil {
+		return nil, fuse.EIO
+	}
+	res, ok := (<-resc).(*pb.ReadResponse)
+	if !ok {
+		vlogf("fs.Read = EIO due to wrong type")
+		return nil, fuse.EIO
+	}
+	return fuse.ReadResultData(res.Data), fuse.OK
 }
