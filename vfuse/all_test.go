@@ -471,3 +471,31 @@ func TestChmod(t *testing.T) {
 		t.Fatalf("Mode %s, expected %s", st.Mode(), os.FileMode(0777))
 	}
 }
+
+// Open a file for read.
+func init() { addWorldTest("TestOpenRead") }
+func TestOpenRead(t *testing.T) {
+	w := getWorld(t)
+	defer w.release()
+	knownBroken(t)
+
+	const contents = "Some test file"
+	w.writeFile(w.cpath("openread/f.txt"), contents)
+
+	f, err := os.Open(w.fpath("openread/f.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close() // backup
+
+	all, err := ioutil.ReadAll(f)
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+	if string(all) != contents {
+		t.Errorf("Contents = %q; want %q", all, contents)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
