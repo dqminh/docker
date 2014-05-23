@@ -411,6 +411,25 @@ func TestReaddirnames(t *testing.T) {
 	}
 }
 
+func (w *world) walk(rootpath func(path ...string) string, pathname string, want *bytes.Buffer) error {
+	err := filepath.Walk(rootpath(pathname), func(path string, fi os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(rootpath("."), path)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(want, "%v = %v", filepath.ToSlash(rel), fi.Mode())
+		if fi.Mode().IsRegular() {
+			fmt.Fprintf(want, " (size %d)", fi.Size())
+		}
+		want.WriteByte('\n')
+		return nil
+	})
+	return err
+}
+
 // Readdirnames on non-empty dir
 func init() { addWorldTest("TestReaddirWalk") }
 func TestReaddirWalk(t *testing.T) {
@@ -420,32 +439,20 @@ func TestReaddirWalk(t *testing.T) {
 	w.writeFile(w.cpath("dirwalk/1.txt"), "one")
 	w.writeFile(w.cpath("dirwalk/sub/2.txt"), "and two")
 
-	var got bytes.Buffer
-	err := filepath.Walk(w.fpath("dirwalk"), func(path string, fi os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		rel, err := filepath.Rel(w.fpath("."), path)
-		if err != nil {
-			t.Fatalf("Rel: %v", err)
-		}
-		fmt.Fprintf(&got, "%v = %v", filepath.ToSlash(rel), fi.Mode())
-		if fi.Mode().IsRegular() {
-			fmt.Fprintf(&got, " (size %d)", fi.Size())
-		}
-		got.WriteByte('\n')
-		return nil
-	})
+	var (
+		want bytes.Buffer
+		got  bytes.Buffer
+	)
+	err := w.walk(w.cpath, "dirwalk", &want)
+	if err != nil {
+		t.Fatalf("Client Walk error: %v", err)
+	}
+	err = w.walk(w.fpath, "dirwalk", &got)
 	if err != nil {
 		t.Fatalf("Walk error: %v", err)
 	}
-	want := `dirwalk = drwxr-x---
-dirwalk/1.txt = -rw-r----- (size 3)
-dirwalk/sub = drwxr-x---
-dirwalk/sub/2.txt = -rw-r----- (size 7)
-`
-	if got.String() != want {
-		t.Errorf("Walk got:\n%s\n\nWant:\n%s", got.String(), want)
+	if got.String() != want.String() {
+		t.Errorf("Walk got:\n%s\n\nWant:\n%s", got.String(), want.String())
 	}
 }
 
