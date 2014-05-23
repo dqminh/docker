@@ -116,6 +116,8 @@ func (s *Server) Run() {
 			res, err = s.handleReadlinkRequest(m)
 		case *pb.RenameRequest:
 			res, err = s.handleRenameRequest(m)
+		case *pb.RmdirRequest:
+			res, err = s.handleRmdirRequest(m)
 		default:
 			log.Fatalf("unhandled request type %T", p.Body)
 		}
@@ -295,6 +297,16 @@ func (s *Server) handleRenameRequest(req *pb.RenameRequest) (proto.Message, erro
 	err := os.Rename(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())),
 		filepath.Join(s.vol.Root, filepath.FromSlash(req.GetTarget())))
 	return &pb.RenameResponse{
+		Err: mapError(err),
+	}, nil
+}
+
+func (s *Server) handleRmdirRequest(req *pb.RmdirRequest) (proto.Message, error) {
+	if !s.vol.Writable {
+		return &pb.RmdirResponse{Err: errRO}, nil
+	}
+	err := os.Remove(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())))
+	return &pb.RmdirResponse{
 		Err: mapError(err),
 	}, nil
 }

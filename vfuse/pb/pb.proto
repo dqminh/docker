@@ -157,11 +157,11 @@ message RenameResponse {
 }
 
 message RmdirRequest {
-//...
+	required string name = 1;
 }
 
 message RmdirResponse {
-//...
+	optional Error err = 1;
 }
 
 message UnlinkRequest {

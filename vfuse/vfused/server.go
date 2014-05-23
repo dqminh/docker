@@ -337,6 +337,21 @@ func (fs *FS) Rename(name string, target string, context *fuse.Context) fuse.Sta
 	return fuseError(res.Err)
 }
 
+func (fs *FS) Rmdir(name string, context *fuse.Context) fuse.Status {
+	vlogf("fs.Rmdir(%q)", name)
+	resc, err := fs.sendPacket(&pb.RmdirRequest{
+		Name: &name,
+	})
+	if err != nil {
+		return fuse.EIO
+	}
+	res, ok := (<-resc).(*pb.RmdirResponse)
+	if !ok {
+		vlogf("fs.Rmdir(%q) = EIO because wrong type", name)
+	}
+	return fuseError(res.Err)
+}
+
 func (fs *FS) StatFs(name string) *fuse.StatfsOut {
 	vlogf("fs.StatFs(%q)", name)
 	out := new(fuse.StatfsOut)

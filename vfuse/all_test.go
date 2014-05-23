@@ -608,3 +608,27 @@ func TestRenameTargetDirNonEmpty(t *testing.T) {
 		t.Fatal("Expected rename to fail")
 	}
 }
+
+// rmdir directory
+func init() { addWorldTest("TestRmdir") }
+func TestRmdir(t *testing.T) {
+	w := getWorld(t)
+	defer w.release()
+
+	w.mkdir(w.cpath("rmdir-new_dir"))
+
+	fpath := w.fpath("rmdir-new_dir")
+	err := os.Remove(fpath)
+	if err != nil {
+		t.Fatalf("Failed to rm directory %q: %v", fpath, err)
+	}
+
+	cpath := w.cpath("rmdir-new_dir")
+	_, err = os.Stat(cpath)
+	if err == nil {
+		t.Fatal("directory %q still exists", cpath)
+	}
+	if !os.IsNotExist(err) {
+		t.Fatal("directory %q still exists: %v", cpath, err)
+	}
+}

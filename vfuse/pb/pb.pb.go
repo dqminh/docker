@@ -688,20 +688,36 @@ func (m *RenameResponse) GetErr() *Error {
 }
 
 type RmdirRequest struct {
-	XXX_unrecognized []byte `json:"-"`
+	Name             *string `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
 }
 
 func (m *RmdirRequest) Reset()         { *m = RmdirRequest{} }
 func (m *RmdirRequest) String() string { return proto.CompactTextString(m) }
 func (*RmdirRequest) ProtoMessage()    {}
 
+func (m *RmdirRequest) GetName() string {
+	if m != nil && m.Name != nil {
+		return *m.Name
+	}
+	return ""
+}
+
 type RmdirResponse struct {
+	Err              *Error `protobuf:"bytes,1,opt,name=err" json:"err,omitempty"`
 	XXX_unrecognized []byte `json:"-"`
 }
 
 func (m *RmdirResponse) Reset()         { *m = RmdirResponse{} }
 func (m *RmdirResponse) String() string { return proto.CompactTextString(m) }
 func (*RmdirResponse) ProtoMessage()    {}
+
+func (m *RmdirResponse) GetErr() *Error {
+	if m != nil {
+		return m.Err
+	}
+	return nil
+}
 
 type UnlinkRequest struct {
 	Name             *string `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
