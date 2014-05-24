@@ -394,6 +394,23 @@ func (fs *FS) Utimens(name string, atime *time.Time, mtime *time.Time, context *
 	return fuseError(res.Err)
 }
 
+func (fs *FS) Unlink(name string, context *fuse.Context) fuse.Status {
+	vlogf("fs.Unlink(%q)", name)
+	resc, err := fs.sendPacket(&pb.UnlinkRequest{
+		Name: &name,
+	})
+	if err != nil {
+		return fuse.EIO
+	}
+	res, ok := (<-resc).(*pb.UnlinkResponse)
+	if !ok {
+		vlogf("fs.Unlink(%q) = EIO because wrong type", name)
+		return fuse.EIO
+	}
+
+	return fuseError(res.Err)
+}
+
 func (fs *FS) StatFs(name string) *fuse.StatfsOut {
 	vlogf("fs.StatFs(%q)", name)
 	out := new(fuse.StatfsOut)

@@ -733,3 +733,44 @@ func TestUtime(t *testing.T) {
 		t.Fatalf("Expected atime %v, got %v", atime, natime)
 	}
 }
+
+// Unlink file
+func init() { addWorldTest("TestUnlink") }
+func TestUnlink(t *testing.T) {
+	w := getWorld(t)
+	defer w.release()
+
+	w.writeFile(w.cpath("unlink/1.txt"), "test file")
+
+	if err := os.Remove(w.fpath("unlink/1.txt")); err != nil {
+		t.Fatal(err)
+	}
+	_, err := os.Stat(w.cpath("unlink/1.txt"))
+	if !os.IsNotExist(err) {
+		t.Fatal("File still alive after unlink")
+	}
+}
+
+// Unlink not exist file
+func init() { addWorldTest("TestUnlinkNotExist") }
+func TestUnlinkNotExist(t *testing.T) {
+	w := getWorld(t)
+	defer w.release()
+
+	if err := os.Remove(w.fpath("unlink/1.txt")); !os.IsNotExist(err) {
+		t.Fatalf("Must be 'not exist' error, got %s", err)
+	}
+}
+
+// Unlink dir
+func init() { addWorldTest("TestUnlinkDir") }
+func TestUnlinkDir(t *testing.T) {
+	w := getWorld(t)
+	defer w.release()
+
+	w.mkdir(w.cpath("unlink/dir"))
+
+	if err := syscall.Unlink(w.fpath("unlink/dir")); err.Error() != "is a directory" {
+		t.Fatalf("Must be 'is a directory' error, got %s", err)
+	}
+}

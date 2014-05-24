@@ -126,6 +126,8 @@ func (s *Server) Run() {
 			res, err = s.handleSymlinkRequest(m)
 		case *pb.UtimeRequest:
 			res, err = s.handleUtimeRequest(m)
+		case *pb.UnlinkRequest:
+			res, err = s.handleUnlinkRequest(m)
 		default:
 			log.Fatalf("unhandled request type %T", p.Body)
 		}
@@ -346,6 +348,16 @@ func (s *Server) handleUtimeRequest(req *pb.UtimeRequest) (proto.Message, error)
 	mtime := time.Unix(mt.GetSec(), int64(mt.GetNsec()))
 	err := os.Chtimes(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())), atime, mtime)
 	return &pb.UtimeResponse{
+		Err: mapError(err),
+	}, nil
+}
+
+func (s *Server) handleUnlinkRequest(req *pb.UnlinkRequest) (proto.Message, error) {
+	if !s.vol.Writable {
+		return &pb.UnlinkResponse{Err: errRO}, nil
+	}
+	err := os.Remove(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())))
+	return &pb.UnlinkResponse{
 		Err: mapError(err),
 	}, nil
 }
