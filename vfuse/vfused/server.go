@@ -352,6 +352,23 @@ func (fs *FS) Rmdir(name string, context *fuse.Context) fuse.Status {
 	return fuseError(res.Err)
 }
 
+func (fs *FS) Symlink(value string, linkName string, context *fuse.Context) fuse.Status {
+	vlogf("fs.Symlink(%q, %q)", value, linkName)
+	resc, err := fs.sendPacket(&pb.SymlinkRequest{
+		Value: &value,
+		Name:  &linkName,
+	})
+	if err != nil {
+		return fuse.EIO
+	}
+	res, ok := (<-resc).(*pb.SymlinkResponse)
+	if !ok {
+		vlogf("fs.Symlink(%q, %q) = EIO", value, linkName)
+		return fuse.EIO
+	}
+	return fuseError(res.Err)
+}
+
 func (fs *FS) StatFs(name string) *fuse.StatfsOut {
 	vlogf("fs.StatFs(%q)", name)
 	out := new(fuse.StatfsOut)

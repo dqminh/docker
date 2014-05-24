@@ -55,15 +55,14 @@ It has these top-level messages:
 package pb
 
 import proto "code.google.com/p/goprotobuf/proto"
-import json "encoding/json"
 import math "math"
 
-// Reference proto, json, and math imports to suppress error if they are not otherwise used.
+// Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
-var _ = &json.SyntaxError{}
 var _ = math.Inf
 
 type Error struct {
+	// Only one may be set.
 	NotExist         *bool   `protobuf:"varint,1,opt,name=not_exist" json:"not_exist,omitempty"`
 	Other            *string `protobuf:"bytes,2,opt,name=other" json:"other,omitempty"`
 	ReadOnly         *bool   `protobuf:"varint,3,opt,name=read_only" json:"read_only,omitempty"`
@@ -96,6 +95,7 @@ func (m *Error) GetReadOnly() bool {
 }
 
 type AttrRequest struct {
+	// One of name or handle must be set:
 	Name             *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
 	Handle           *uint64 `protobuf:"varint,2,opt,name=handle" json:"handle,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
@@ -312,6 +312,7 @@ func (m *ReadlinkResponse) GetTarget() string {
 }
 
 type ChmodRequest struct {
+	// One of name or handle must be set:
 	Name             *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
 	Handle           *uint64 `protobuf:"varint,2,opt,name=handle" json:"handle,omitempty"`
 	Mode             *uint32 `protobuf:"varint,3,req,name=mode" json:"mode,omitempty"`
@@ -360,8 +361,14 @@ func (m *ChmodResponse) GetErr() *Error {
 }
 
 type ChownRequest struct {
-	Name             *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
-	Handle           *uint64 `protobuf:"varint,2,opt,name=handle" json:"handle,omitempty"`
+	// One of name or handle must be set:
+	Name   *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
+	Handle *uint64 `protobuf:"varint,2,opt,name=handle" json:"handle,omitempty"`
+	// This can set either the userid or the groupid, or both,
+	// depending on what's set. The server should send both the numeric
+	// and named version of the user and/or group, for the client to
+	// determine the mapping, since the two machines will likely have
+	// different sets of users.
 	Uid              *uint32 `protobuf:"varint,3,opt,name=uid" json:"uid,omitempty"`
 	Gid              *uint32 `protobuf:"varint,4,opt,name=gid" json:"gid,omitempty"`
 	User             *string `protobuf:"bytes,5,opt,name=user" json:"user,omitempty"`
@@ -432,6 +439,7 @@ func (m *ChownResponse) GetErr() *Error {
 }
 
 type Time struct {
+	// Like a Go time.Time.
 	Sec              *int64 `protobuf:"varint,1,req,name=sec" json:"sec,omitempty"`
 	Nsec             *int32 `protobuf:"varint,2,opt,name=nsec" json:"nsec,omitempty"`
 	XXX_unrecognized []byte `json:"-"`
@@ -456,6 +464,7 @@ func (m *Time) GetNsec() int32 {
 }
 
 type UtimeRequest struct {
+	// One of name or handle must be set:
 	Name             *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
 	Handle           *uint64 `protobuf:"varint,2,opt,name=handle" json:"handle,omitempty"`
 	Atime            *Time   `protobuf:"bytes,3,opt,name=atime" json:"atime,omitempty"`
@@ -512,6 +521,7 @@ func (m *UtimeResponse) GetErr() *Error {
 }
 
 type TruncateRequest struct {
+	// One of name or handle must be set:
 	Name             *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
 	Handle           *uint64 `protobuf:"varint,2,opt,name=handle" json:"handle,omitempty"`
 	Size             *uint64 `protobuf:"varint,3,req,name=size" json:"size,omitempty"`
@@ -576,20 +586,44 @@ func (m *LinkResponse) String() string { return proto.CompactTextString(m) }
 func (*LinkResponse) ProtoMessage()    {}
 
 type SymlinkRequest struct {
-	XXX_unrecognized []byte `json:"-"`
+	Value            *string `protobuf:"bytes,1,req,name=value" json:"value,omitempty"`
+	Name             *string `protobuf:"bytes,2,req,name=name" json:"name,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
 }
 
 func (m *SymlinkRequest) Reset()         { *m = SymlinkRequest{} }
 func (m *SymlinkRequest) String() string { return proto.CompactTextString(m) }
 func (*SymlinkRequest) ProtoMessage()    {}
 
+func (m *SymlinkRequest) GetValue() string {
+	if m != nil && m.Value != nil {
+		return *m.Value
+	}
+	return ""
+}
+
+func (m *SymlinkRequest) GetName() string {
+	if m != nil && m.Name != nil {
+		return *m.Name
+	}
+	return ""
+}
+
 type SymlinkResponse struct {
+	Err              *Error `protobuf:"bytes,1,opt,name=err" json:"err,omitempty"`
 	XXX_unrecognized []byte `json:"-"`
 }
 
 func (m *SymlinkResponse) Reset()         { *m = SymlinkResponse{} }
 func (m *SymlinkResponse) String() string { return proto.CompactTextString(m) }
 func (*SymlinkResponse) ProtoMessage()    {}
+
+func (m *SymlinkResponse) GetErr() *Error {
+	if m != nil {
+		return m.Err
+	}
+	return nil
+}
 
 type MkdirRequest struct {
 	Name             *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
@@ -888,6 +922,7 @@ func (m *ReadRequest) GetSize() uint64 {
 }
 
 type ReadResponse struct {
+	// One will be set:
 	Err              *Error `protobuf:"bytes,1,opt,name=err" json:"err,omitempty"`
 	Data             []byte `protobuf:"bytes,2,opt,name=data" json:"data,omitempty"`
 	XXX_unrecognized []byte `json:"-"`

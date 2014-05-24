@@ -118,6 +118,8 @@ func (s *Server) Run() {
 			res, err = s.handleRenameRequest(m)
 		case *pb.RmdirRequest:
 			res, err = s.handleRmdirRequest(m)
+		case *pb.SymlinkRequest:
+			res, err = s.handleSymlinkRequest(m)
 		default:
 			log.Fatalf("unhandled request type %T", p.Body)
 		}
@@ -307,6 +309,16 @@ func (s *Server) handleRmdirRequest(req *pb.RmdirRequest) (proto.Message, error)
 	}
 	err := os.Remove(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())))
 	return &pb.RmdirResponse{
+		Err: mapError(err),
+	}, nil
+}
+
+func (s *Server) handleSymlinkRequest(req *pb.SymlinkRequest) (proto.Message, error) {
+	if !s.vol.Writable {
+		return &pb.SymlinkResponse{Err: errRO}, nil
+	}
+	err := os.Symlink(req.GetValue(), filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())))
+	return &pb.SymlinkResponse{
 		Err: mapError(err),
 	}, nil
 }

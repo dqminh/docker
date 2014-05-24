@@ -123,11 +123,12 @@ message LinkResponse {
 }
 
 message SymlinkRequest {
-//...
+	required string value = 1;
+	required string name = 2;
 }
 
 message SymlinkResponse {
-//...
+	optional Error err = 1;
 }
 
 message MkdirRequest {

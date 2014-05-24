@@ -632,3 +632,74 @@ func TestRmdir(t *testing.T) {
 		t.Fatal("directory %q still exists: %v", cpath, err)
 	}
 }
+
+// Symlink file
+func init() { addWorldTest("TestSymlink") }
+func TestSymlink(t *testing.T) {
+	w := getWorld(t)
+	defer w.release()
+
+	w.writeFile(w.cpath("symlink/before.txt"), "test file")
+
+	err := os.Symlink("../symlink/before.txt", w.fpath("symlink/after.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fi, err := os.Lstat(w.cpath("symlink/after.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fi.Mode()&os.ModeSymlink == 0 {
+		t.Fatal("File is not symlink")
+	}
+	content, err := ioutil.ReadFile(w.cpath("symlink/after.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(content) != "test file" {
+		t.Fatal("Wrong content read from symlink, got %s, must be \"test file\"", content)
+	}
+}
+
+// Symlink file exists
+func init() { addWorldTest("TestSymlinkFileAlreadyExists") }
+func TestSymlinkFileAlreadyExists(t *testing.T) {
+	w := getWorld(t)
+	defer w.release()
+
+	w.writeFile(w.cpath("symlink/exists/before.txt"), "test file")
+	w.writeFile(w.cpath("symlink/exists/after.txt"), "test file exists")
+
+	err := os.Symlink("../symlink/exists/before.txt", w.fpath("symlink/exists/after.txt"))
+	if !os.IsExist(err) {
+		t.Fatalf("Error must be 'not exist', got %T:%s", err, err)
+	}
+}
+
+// Symlink dir
+func init() { addWorldTest("TestSymlinkDir") }
+func TestSymlinkDir(t *testing.T) {
+	w := getWorld(t)
+	defer w.release()
+
+	w.writeFile(w.cpath("symlink/dir/before/linked.txt"), "test file")
+
+	err := os.Symlink("../dir/before", w.fpath("symlink/dir/after"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fi, err := os.Lstat(w.cpath("symlink/dir/after"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fi.Mode()&os.ModeSymlink == 0 {
+		t.Fatal("Directory is not symlink")
+	}
+	content, err := ioutil.ReadFile(w.cpath("symlink/dir/after/linked.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(content) != "test file" {
+		t.Fatal("Wrong content read from symlinked dir, got %s, must be \"test file\"", content)
+	}
+}
