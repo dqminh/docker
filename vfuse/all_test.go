@@ -770,7 +770,7 @@ func TestUnlinkDir(t *testing.T) {
 
 	w.mkdir(w.cpath("unlink/dir"))
 
-	if err := syscall.Unlink(w.fpath("unlink/dir")); err.Error() != "is a directory" {
+	if err := syscall.Unlink(w.fpath("unlink/dir")); err != syscall.EISDIR {
 		t.Fatalf("Must be 'is a directory' error, got %s", err)
 	}
 }
