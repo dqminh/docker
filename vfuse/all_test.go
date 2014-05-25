@@ -820,3 +820,27 @@ func TestTruncateOpenFile(t *testing.T) {
 		t.Fatalf("Trucated file content %q, but expected \"123\"", content)
 	}
 }
+
+// Mknod
+func init() { addWorldTest("TestMknod") }
+func TestMknod(t *testing.T) {
+	w := getWorld(t)
+	defer w.release()
+	knownBroken(t)
+
+	mode := uint32(syscall.S_IFSOCK | 0777)
+	dev := 5
+
+	w.mkdir(w.cpath("mknod"))
+
+	if err := syscall.Mknod(w.fpath("mknod/dev"), mode, dev); err != nil {
+		t.Fatal(err)
+	}
+	fi, err := os.Stat(w.cpath("mknod/dev"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fi.Mode()&(os.ModeDevice|os.ModeCharDevice) == 0 {
+		t.Fatal("Expected to be character device")
+	}
+}

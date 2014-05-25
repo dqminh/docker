@@ -12,6 +12,7 @@ import (
 	"path"
 	"path/filepath"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/dotcloud/docker/vfuse"
@@ -132,6 +133,8 @@ func (s *Server) Run() {
 			res, err = s.handleUnlinkRequest(m)
 		case *pb.TruncateRequest:
 			res, err = s.handleTruncateRequest(m)
+		case *pb.MknodRequest:
+			res, err = s.handleMknodRequest(m)
 		default:
 			log.Fatalf("unhandled request type %T", p.Body)
 		}
@@ -447,6 +450,16 @@ func (s *Server) handleTruncateRequest(req *pb.TruncateRequest) (proto.Message, 
 	}
 	err := os.Truncate(filepath.Join(s.vol.Root, filepath.FromSlash(name)), int64(req.GetSize()))
 	return &pb.TruncateResponse{
+		Err: mapError(err),
+	}, nil
+}
+
+func (s *Server) handleMknodRequest(req *pb.MknodRequest) (proto.Message, error) {
+	if !s.vol.Writable {
+		return &pb.MknodResponse{Err: errRO}, nil
+	}
+	err := syscall.Mknod(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())), req.GetMode(), int(req.GetDev()))
+	return &pb.MknodResponse{
 		Err: mapError(err),
 	}, nil
 }

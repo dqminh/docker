@@ -388,7 +388,25 @@ func (fs *FS) Utimens(name string, atime *time.Time, mtime *time.Time, context *
 	}
 	res, ok := (<-resc).(*pb.UtimeResponse)
 	if !ok {
-		vlogf("fs.Uitmens(%q, %v, %v) = EIO because wrong type", name, atime, mtime)
+		vlogf("fs.Utimens(%q, %v, %v) = EIO because wrong type", name, atime, mtime)
+		return fuse.EIO
+	}
+	return fuseError(res.Err)
+}
+
+func (fs *FS) Mknod(name string, mode uint32, dev uint32, context *fuse.Context) fuse.Status {
+	vlogf("fs.Mknod(%q, mode: %d, dev: %d)", name, mode, dev)
+	resc, err := fs.sendPacket(&pb.MknodRequest{
+		Name: &name,
+		Mode: &mode,
+		Dev:  &dev,
+	})
+	if err != nil {
+		return fuse.EIO
+	}
+	res, ok := (<-resc).(*pb.MknodResponse)
+	if !ok {
+		vlogf("fs.Mknod(%q, %d, %d) = EIO because wrong type", name, mode, dev)
 		return fuse.EIO
 	}
 	return fuseError(res.Err)

@@ -142,11 +142,13 @@ message MkdirResponse {
 }
 
 message MknodRequest {
-//...
+	required string name = 1;
+	required uint32 mode = 2;
+	optional uint32 dev = 3;
 }
 
 message MknodResponse {
-//...
+	optional Error err = 1;
 }
 
 message RenameRequest {

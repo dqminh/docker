@@ -62,6 +62,7 @@ var _ = proto.Marshal
 var _ = math.Inf
 
 type Error struct {
+	// Only one may be set.
 	NotExist         *bool   `protobuf:"varint,1,opt,name=not_exist" json:"not_exist,omitempty"`
 	ReadOnly         *bool   `protobuf:"varint,3,opt,name=read_only" json:"read_only,omitempty"`
 	NotDir           *bool   `protobuf:"varint,4,opt,name=not_dir" json:"not_dir,omitempty"`
@@ -102,6 +103,7 @@ func (m *Error) GetOther() string {
 }
 
 type AttrRequest struct {
+	// One of name or handle must be set:
 	Name             *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
 	Handle           *uint64 `protobuf:"varint,2,opt,name=handle" json:"handle,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
@@ -318,6 +320,7 @@ func (m *ReadlinkResponse) GetTarget() string {
 }
 
 type ChmodRequest struct {
+	// One of name or handle must be set:
 	Name             *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
 	Handle           *uint64 `protobuf:"varint,2,opt,name=handle" json:"handle,omitempty"`
 	Mode             *uint32 `protobuf:"varint,3,req,name=mode" json:"mode,omitempty"`
@@ -366,8 +369,14 @@ func (m *ChmodResponse) GetErr() *Error {
 }
 
 type ChownRequest struct {
-	Name             *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
-	Handle           *uint64 `protobuf:"varint,2,opt,name=handle" json:"handle,omitempty"`
+	// One of name or handle must be set:
+	Name   *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
+	Handle *uint64 `protobuf:"varint,2,opt,name=handle" json:"handle,omitempty"`
+	// This can set either the userid or the groupid, or both,
+	// depending on what's set. The server should send both the numeric
+	// and named version of the user and/or group, for the client to
+	// determine the mapping, since the two machines will likely have
+	// different sets of users.
 	Uid              *uint32 `protobuf:"varint,3,opt,name=uid" json:"uid,omitempty"`
 	Gid              *uint32 `protobuf:"varint,4,opt,name=gid" json:"gid,omitempty"`
 	User             *string `protobuf:"bytes,5,opt,name=user" json:"user,omitempty"`
@@ -438,6 +447,7 @@ func (m *ChownResponse) GetErr() *Error {
 }
 
 type Time struct {
+	// Like a Go time.Time.
 	Sec              *int64 `protobuf:"varint,1,req,name=sec" json:"sec,omitempty"`
 	Nsec             *int32 `protobuf:"varint,2,opt,name=nsec" json:"nsec,omitempty"`
 	XXX_unrecognized []byte `json:"-"`
@@ -462,6 +472,7 @@ func (m *Time) GetNsec() int32 {
 }
 
 type UtimeRequest struct {
+	// One of name or handle must be set:
 	Name             *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
 	Handle           *uint64 `protobuf:"varint,2,opt,name=handle" json:"handle,omitempty"`
 	Atime            *Time   `protobuf:"bytes,3,opt,name=atime" json:"atime,omitempty"`
@@ -518,6 +529,7 @@ func (m *UtimeResponse) GetErr() *Error {
 }
 
 type TruncateRequest struct {
+	// One of name or handle must be set:
 	Name             *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
 	Handle           *uint64 `protobuf:"varint,2,opt,name=handle" json:"handle,omitempty"`
 	Size             *uint64 `protobuf:"varint,3,req,name=size" json:"size,omitempty"`
@@ -662,20 +674,52 @@ func (m *MkdirResponse) GetErr() *Error {
 }
 
 type MknodRequest struct {
-	XXX_unrecognized []byte `json:"-"`
+	Name             *string `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
+	Mode             *uint32 `protobuf:"varint,2,req,name=mode" json:"mode,omitempty"`
+	Dev              *uint32 `protobuf:"varint,3,opt,name=dev" json:"dev,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
 }
 
 func (m *MknodRequest) Reset()         { *m = MknodRequest{} }
 func (m *MknodRequest) String() string { return proto.CompactTextString(m) }
 func (*MknodRequest) ProtoMessage()    {}
 
+func (m *MknodRequest) GetName() string {
+	if m != nil && m.Name != nil {
+		return *m.Name
+	}
+	return ""
+}
+
+func (m *MknodRequest) GetMode() uint32 {
+	if m != nil && m.Mode != nil {
+		return *m.Mode
+	}
+	return 0
+}
+
+func (m *MknodRequest) GetDev() uint32 {
+	if m != nil && m.Dev != nil {
+		return *m.Dev
+	}
+	return 0
+}
+
 type MknodResponse struct {
+	Err              *Error `protobuf:"bytes,1,opt,name=err" json:"err,omitempty"`
 	XXX_unrecognized []byte `json:"-"`
 }
 
 func (m *MknodResponse) Reset()         { *m = MknodResponse{} }
 func (m *MknodResponse) String() string { return proto.CompactTextString(m) }
 func (*MknodResponse) ProtoMessage()    {}
+
+func (m *MknodResponse) GetErr() *Error {
+	if m != nil {
+		return m.Err
+	}
+	return nil
+}
 
 type RenameRequest struct {
 	Name             *string `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
@@ -918,6 +962,7 @@ func (m *ReadRequest) GetSize() uint64 {
 }
 
 type ReadResponse struct {
+	// One will be set:
 	Err              *Error `protobuf:"bytes,1,opt,name=err" json:"err,omitempty"`
 	Data             []byte `protobuf:"bytes,2,opt,name=data" json:"data,omitempty"`
 	XXX_unrecognized []byte `json:"-"`
