@@ -2,9 +2,10 @@ package pb;
 
 message Error {
 	// Only one may be set.
-	optional bool not_exist = 1;
-	optional string other = 2;
-	optional bool read_only = 3;
+	optional bool not_exist = 1; // ENOENT
+	optional bool read_only = 3; // EROFS
+	optional bool not_dir = 4;   // ENOTDIR
+	optional string other = 2; // maps to EIO, but prefer more specific ones
 }
 
 message AttrRequest {

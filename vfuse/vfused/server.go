@@ -93,6 +93,9 @@ func fuseError(err *pb.Error) fuse.Status {
 	if err.GetReadOnly() {
 		return fuse.EROFS
 	}
+	if err.GetNotDir() {
+		return fuse.ENOTDIR
+	}
 	// TODO: more
 	return fuse.EIO
 }

@@ -64,7 +64,10 @@ type Server struct {
 	c   *vfuse.Client
 }
 
-var errRO = &pb.Error{ReadOnly: proto.Bool(true)}
+var (
+	errRO     = &pb.Error{ReadOnly: proto.Bool(true)}
+	errNotDir = &pb.Error{NotDir: proto.Bool(true)}
+)
 
 func vlogf(format string, args ...interface{}) {
 	if !*verbose {
@@ -310,10 +313,17 @@ func (s *Server) handleRmdirRequest(req *pb.RmdirRequest) (proto.Message, error)
 	if !s.vol.Writable {
 		return &pb.RmdirResponse{Err: errRO}, nil
 	}
-	err := os.Remove(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())))
-	return &pb.RmdirResponse{
-		Err: mapError(err),
-	}, nil
+	path := filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName()))
+	fi, err := os.Lstat(path)
+	if err != nil {
+		return &pb.RmdirResponse{Err: mapError(err)}, nil
+	}
+	if !fi.IsDir() {
+		return &pb.RmdirResponse{Err: errNotDir}, nil
+	}
+
+	err = os.Remove(path)
+	return &pb.RmdirResponse{Err: mapError(err)}, nil
 }
 
 func (s *Server) handleSymlinkRequest(req *pb.SymlinkRequest) (proto.Message, error) {

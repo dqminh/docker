@@ -62,10 +62,10 @@ var _ = proto.Marshal
 var _ = math.Inf
 
 type Error struct {
-	// Only one may be set.
 	NotExist         *bool   `protobuf:"varint,1,opt,name=not_exist" json:"not_exist,omitempty"`
-	Other            *string `protobuf:"bytes,2,opt,name=other" json:"other,omitempty"`
 	ReadOnly         *bool   `protobuf:"varint,3,opt,name=read_only" json:"read_only,omitempty"`
+	NotDir           *bool   `protobuf:"varint,4,opt,name=not_dir" json:"not_dir,omitempty"`
+	Other            *string `protobuf:"bytes,2,opt,name=other" json:"other,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
 
@@ -80,13 +80,6 @@ func (m *Error) GetNotExist() bool {
 	return false
 }
 
-func (m *Error) GetOther() string {
-	if m != nil && m.Other != nil {
-		return *m.Other
-	}
-	return ""
-}
-
 func (m *Error) GetReadOnly() bool {
 	if m != nil && m.ReadOnly != nil {
 		return *m.ReadOnly
@@ -94,8 +87,21 @@ func (m *Error) GetReadOnly() bool {
 	return false
 }
 
+func (m *Error) GetNotDir() bool {
+	if m != nil && m.NotDir != nil {
+		return *m.NotDir
+	}
+	return false
+}
+
+func (m *Error) GetOther() string {
+	if m != nil && m.Other != nil {
+		return *m.Other
+	}
+	return ""
+}
+
 type AttrRequest struct {
-	// One of name or handle must be set:
 	Name             *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
 	Handle           *uint64 `protobuf:"varint,2,opt,name=handle" json:"handle,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
@@ -312,7 +318,6 @@ func (m *ReadlinkResponse) GetTarget() string {
 }
 
 type ChmodRequest struct {
-	// One of name or handle must be set:
 	Name             *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
 	Handle           *uint64 `protobuf:"varint,2,opt,name=handle" json:"handle,omitempty"`
 	Mode             *uint32 `protobuf:"varint,3,req,name=mode" json:"mode,omitempty"`
@@ -361,14 +366,8 @@ func (m *ChmodResponse) GetErr() *Error {
 }
 
 type ChownRequest struct {
-	// One of name or handle must be set:
-	Name   *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
-	Handle *uint64 `protobuf:"varint,2,opt,name=handle" json:"handle,omitempty"`
-	// This can set either the userid or the groupid, or both,
-	// depending on what's set. The server should send both the numeric
-	// and named version of the user and/or group, for the client to
-	// determine the mapping, since the two machines will likely have
-	// different sets of users.
+	Name             *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
+	Handle           *uint64 `protobuf:"varint,2,opt,name=handle" json:"handle,omitempty"`
 	Uid              *uint32 `protobuf:"varint,3,opt,name=uid" json:"uid,omitempty"`
 	Gid              *uint32 `protobuf:"varint,4,opt,name=gid" json:"gid,omitempty"`
 	User             *string `protobuf:"bytes,5,opt,name=user" json:"user,omitempty"`
@@ -439,7 +438,6 @@ func (m *ChownResponse) GetErr() *Error {
 }
 
 type Time struct {
-	// Like a Go time.Time.
 	Sec              *int64 `protobuf:"varint,1,req,name=sec" json:"sec,omitempty"`
 	Nsec             *int32 `protobuf:"varint,2,opt,name=nsec" json:"nsec,omitempty"`
 	XXX_unrecognized []byte `json:"-"`
@@ -464,7 +462,6 @@ func (m *Time) GetNsec() int32 {
 }
 
 type UtimeRequest struct {
-	// One of name or handle must be set:
 	Name             *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
 	Handle           *uint64 `protobuf:"varint,2,opt,name=handle" json:"handle,omitempty"`
 	Atime            *Time   `protobuf:"bytes,3,opt,name=atime" json:"atime,omitempty"`
@@ -521,7 +518,6 @@ func (m *UtimeResponse) GetErr() *Error {
 }
 
 type TruncateRequest struct {
-	// One of name or handle must be set:
 	Name             *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
 	Handle           *uint64 `protobuf:"varint,2,opt,name=handle" json:"handle,omitempty"`
 	Size             *uint64 `protobuf:"varint,3,req,name=size" json:"size,omitempty"`
@@ -922,7 +918,6 @@ func (m *ReadRequest) GetSize() uint64 {
 }
 
 type ReadResponse struct {
-	// One will be set:
 	Err              *Error `protobuf:"bytes,1,opt,name=err" json:"err,omitempty"`
 	Data             []byte `protobuf:"bytes,2,opt,name=data" json:"data,omitempty"`
 	XXX_unrecognized []byte `json:"-"`
