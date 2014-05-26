@@ -411,6 +411,24 @@ func (fs *FS) Unlink(name string, context *fuse.Context) fuse.Status {
 	return fuseError(res.Err)
 }
 
+func (fs *FS) Truncate(name string, size uint64, context *fuse.Context) fuse.Status {
+	vlogf("fs.Truncate(%q, %d)", name, size)
+	resc, err := fs.sendPacket(&pb.TruncateRequest{
+		Name: &name,
+		Size: &size,
+	})
+	if err != nil {
+		return fuse.EIO
+	}
+	res, ok := (<-resc).(*pb.TruncateResponse)
+	if !ok {
+		vlogf("fs.Truncate(%q, %d) = EIO because wrong type", name, size)
+		return fuse.EIO
+	}
+
+	return fuseError(res.Err)
+}
+
 func (fs *FS) StatFs(name string) *fuse.StatfsOut {
 	vlogf("fs.StatFs(%q)", name)
 	out := new(fuse.StatfsOut)
@@ -470,4 +488,21 @@ func (f *file) Read(dest []byte, off int64) (fuse.ReadResult, fuse.Status) {
 		return nil, fuse.EIO
 	}
 	return fuse.ReadResultData(res.Data), fuse.OK
+}
+
+func (f *file) Truncate(size uint64) fuse.Status {
+	vlogf("fs.Truncate(size=%d)", size)
+	resc, err := f.fs.sendPacket(&pb.TruncateRequest{
+		Handle: &f.handle,
+		Size:   &size,
+	})
+	if err != nil {
+		return fuse.EIO
+	}
+	res, ok := (<-resc).(*pb.TruncateResponse)
+	if !ok {
+		vlogf("fs.Truncate(size=%d) = EIO due to wrong type", size)
+		return fuse.EIO
+	}
+	return fuseError(res.Err)
 }

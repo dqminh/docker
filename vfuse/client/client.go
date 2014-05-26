@@ -4,12 +4,15 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"net"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -65,8 +68,9 @@ type Server struct {
 }
 
 var (
-	errRO     = &pb.Error{ReadOnly: proto.Bool(true)}
-	errNotDir = &pb.Error{NotDir: proto.Bool(true)}
+	errRO      = &pb.Error{ReadOnly: proto.Bool(true)}
+	errNotDir  = &pb.Error{NotDir: proto.Bool(true)}
+	errBadPath = errors.New("Path must be relative and clean")
 )
 
 func vlogf(format string, args ...interface{}) {
@@ -128,6 +132,8 @@ func (s *Server) Run() {
 			res, err = s.handleUtimeRequest(m)
 		case *pb.UnlinkRequest:
 			res, err = s.handleUnlinkRequest(m)
+		case *pb.TruncateRequest:
+			res, err = s.handleTruncateRequest(m)
 		default:
 			log.Fatalf("unhandled request type %T", p.Body)
 		}
@@ -151,6 +157,13 @@ func mapError(err error) *pb.Error {
 	}
 	// TODO: more specific types
 	return &pb.Error{Other: proto.String(err.Error())}
+}
+
+func checkPath(p string) error {
+	if strings.HasPrefix(p, "/") || p == "" || p != path.Clean(p) {
+		return errBadPath
+	}
+	return nil
 }
 
 // mapMode maps from a Go os.FileMode to a Linux FUSE uint32 mode.
@@ -232,8 +245,15 @@ func (s *Server) handleMkdirRequest(req *pb.MkdirRequest) (proto.Message, error)
 
 func (s *Server) handleOpenRequest(req *pb.OpenRequest) (proto.Message, error) {
 	// TODO: look at flags and return errRO earlier, instead of at the write later.
-	// TODO: look at flags at all, and use OpenFile
-	f, err := os.Open(req.GetName())
+	var f *os.File
+	var err error
+	flags := int(req.GetFlags())
+	if flags != 0 {
+		// TODO: May be wrong perm usage
+		f, err = os.OpenFile(req.GetName(), flags, 0)
+	} else {
+		f, err = os.Open(req.GetName())
+	}
 	if err != nil {
 		return &pb.OpenResponse{Err: mapError(err)}, nil
 	}
@@ -358,6 +378,41 @@ func (s *Server) handleUnlinkRequest(req *pb.UnlinkRequest) (proto.Message, erro
 	}
 	err := os.Remove(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())))
 	return &pb.UnlinkResponse{
+		Err: mapError(err),
+	}, nil
+}
+
+func (s *Server) handleTruncateRequest(req *pb.TruncateRequest) (proto.Message, error) {
+	if !s.vol.Writable {
+		return &pb.TruncateResponse{Err: errRO}, nil
+	}
+	h := req.GetHandle()
+	if h != 0 {
+		s.vol.mu.Lock()
+		f, ok := s.vol.files[h]
+		s.vol.mu.Unlock()
+
+		size := req.GetSize()
+		if ok {
+			err := f.Truncate(int64(size))
+			return &pb.TruncateResponse{
+				Err: mapError(err),
+			}, nil
+		}
+		err := fmt.Sprintf("Truncating non-open handle %d", h)
+		vlogf("Truncate(%d, %d): %s", h, size, err)
+		return &pb.TruncateResponse{
+			Err: &pb.Error{Other: proto.String(err)},
+		}, nil
+	}
+	name := req.GetName()
+	if err := checkPath(name); err != nil {
+		return &pb.TruncateResponse{
+			Err: &pb.Error{Other: proto.String(err.Error())},
+		}, nil
+	}
+	err := os.Truncate(filepath.Join(s.vol.Root, filepath.FromSlash(name)), int64(req.GetSize()))
+	return &pb.TruncateResponse{
 		Err: mapError(err),
 	}, nil
 }

@@ -774,3 +774,49 @@ func TestUnlinkDir(t *testing.T) {
 		t.Fatalf("Must be 'is a directory' error, got %s", err)
 	}
 }
+
+// Truncate file
+func init() { addWorldTest("TestTruncateFile") }
+func TestTruncateFile(t *testing.T) {
+	w := getWorld(t)
+	defer w.release()
+
+	w.writeFile(w.cpath("truncate/file"), "123456")
+
+	if err := os.Truncate(w.fpath("truncate/file"), 3); err != nil {
+		t.Fatal(err)
+	}
+	content, err := ioutil.ReadFile(w.cpath("truncate/file"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(content) != "123" {
+		t.Fatalf("Trucated file content %q, but expected \"123\"", content)
+	}
+}
+
+// Truncate open file
+func init() { addWorldTest("TestTruncateOpenFile") }
+func TestTruncateOpenFile(t *testing.T) {
+	w := getWorld(t)
+	defer w.release()
+
+	w.writeFile(w.cpath("truncate/openfile"), "123456")
+
+	f, err := os.OpenFile(w.fpath("truncate/openfile"), os.O_RDWR, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = f.Truncate(3)
+	f.Close()
+	if err != nil {
+		t.Fatalf("%T, %s", err, err)
+	}
+	content, err := ioutil.ReadFile(w.cpath("truncate/openfile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(content) != "123" {
+		t.Fatalf("Trucated file content %q, but expected \"123\"", content)
+	}
+}
