@@ -21,12 +21,19 @@ var (
 	messageFromType = map[PacketType]func() proto.Message{}
 )
 
+func newFunc(m proto.Message) func() proto.Message {
+	t := reflect.TypeOf(m).Elem()
+	return func() proto.Message {
+		return reflect.New(t).Interface().(proto.Message)
+	}
+}
+
 func addRPC(req, res proto.Message) {
 	if req != nil {
-		messageFromType[maxPacketType+0] = func() proto.Message { return proto.Clone(req) }
+		messageFromType[maxPacketType+0] = newFunc(req)
 	}
 	if res != nil {
-		messageFromType[maxPacketType+1] = func() proto.Message { return proto.Clone(res) }
+		messageFromType[maxPacketType+1] = newFunc(res)
 	}
 	maxPacketType += 2
 }
