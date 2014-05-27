@@ -458,8 +458,9 @@ func (s *Server) handleMknodRequest(req *pb.MknodRequest) (proto.Message, error)
 	if !s.vol.Writable {
 		return &pb.MknodResponse{Err: errRO}, nil
 	}
+	if !validPath(req.GetName()) {
+		return &pb.MknodResponse{Err: errBadPath}, nil
+	}
 	err := syscall.Mknod(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())), req.GetMode(), int(req.GetDev()))
-	return &pb.MknodResponse{
-		Err: mapError(err),
-	}, nil
+	return &pb.MknodResponse{Err: mapError(err)}, nil
 }
