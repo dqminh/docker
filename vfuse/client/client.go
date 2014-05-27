@@ -185,8 +185,15 @@ func mapMode(m os.FileMode) uint32 {
 		mode |= S_IFREG
 	} else if m&os.ModeSymlink != 0 {
 		mode |= S_IFLNK
+	} else if m&(os.ModeDevice|os.ModeCharDevice) == (os.ModeDevice | os.ModeCharDevice) {
+		mode |= S_IFCHR
+	} else if m&os.ModeDevice != 0 {
+		mode |= S_IFBLK
+	} else if m&os.ModeNamedPipe != 0 {
+		mode |= S_IFIFO
+	} else if m&os.ModeSocket != 0 {
+		mode |= S_IFSOCK
 	}
-	// TODO: more
 	return mode
 }
 
@@ -462,5 +469,8 @@ func (s *Server) handleMknodRequest(req *pb.MknodRequest) (proto.Message, error)
 		return &pb.MknodResponse{Err: errBadPath}, nil
 	}
 	err := syscall.Mknod(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())), req.GetMode(), int(req.GetDev()))
+	if err != nil {
+		vlogf("Mknod(%q): %v", req.GetName(), err)
+	}
 	return &pb.MknodResponse{Err: mapError(err)}, nil
 }

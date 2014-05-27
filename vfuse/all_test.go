@@ -826,10 +826,9 @@ func init() { addWorldTest("TestMknod") }
 func TestMknod(t *testing.T) {
 	w := getWorld(t)
 	defer w.release()
-	knownBroken(t)
 
-	mode := uint32(syscall.S_IFSOCK | 0777)
-	dev := 5
+	mode := uint32(syscall.S_IFSOCK | 0700)
+	dev := 0
 
 	w.mkdir(w.cpath("mknod"))
 
@@ -840,7 +839,7 @@ func TestMknod(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if fi.Mode()&(os.ModeDevice|os.ModeCharDevice) == 0 {
-		t.Fatal("Expected to be character device")
+	if fi.Mode()&os.ModeSocket == 0 {
+		t.Fatal("Expected to be socket; got %v", fi.Mode())
 	}
 }
