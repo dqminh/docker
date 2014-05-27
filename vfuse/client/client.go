@@ -4,7 +4,6 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -12,7 +11,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -70,7 +68,7 @@ type Server struct {
 var (
 	errRO      = &pb.Error{ReadOnly: proto.Bool(true)}
 	errNotDir  = &pb.Error{NotDir: proto.Bool(true)}
-	errBadPath = errors.New("Path must be relative and clean")
+	errBadPath = &pb.Error{Other: proto.String("Path must be relative and clean")}
 )
 
 func vlogf(format string, args ...interface{}) {
@@ -159,11 +157,11 @@ func mapError(err error) *pb.Error {
 	return &pb.Error{Other: proto.String(err.Error())}
 }
 
-func checkPath(p string) error {
-	if strings.HasPrefix(p, "/") || p == "" || p != path.Clean(p) {
-		return errBadPath
+func validPath(p string) bool {
+	if p == "" || filepath.IsAbs(p) || p != path.Clean(p) {
+		return false
 	}
-	return nil
+	return true
 }
 
 // mapMode maps from a Go os.FileMode to a Linux FUSE uint32 mode.
@@ -190,8 +188,12 @@ func mapMode(m os.FileMode) uint32 {
 }
 
 func (s *Server) handleAttrRequest(req *pb.AttrRequest) (proto.Message, error) {
-	fi, err := os.Lstat(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())))
 	res := new(pb.AttrResponse)
+	if !validPath(req.GetName()) {
+		res.Err = errBadPath
+		return res, nil
+	}
+	fi, err := os.Lstat(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())))
 	if err != nil {
 		res.Err = mapError(err)
 		return res, nil
@@ -208,6 +210,10 @@ func (s *Server) handleChmodRequest(req *pb.ChmodRequest) (proto.Message, error)
 	if !s.vol.Writable {
 		return &pb.ChmodResponse{Err: errRO}, nil
 	}
+	if !validPath(req.GetName()) {
+		return &pb.ChmodResponse{Err: errBadPath}, nil
+	}
+
 	err := os.Chmod(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())), os.FileMode(req.GetMode()))
 	return &pb.ChmodResponse{
 		Err: mapError(err),
@@ -237,6 +243,9 @@ func (s *Server) handleMkdirRequest(req *pb.MkdirRequest) (proto.Message, error)
 	if !s.vol.Writable {
 		return &pb.MkdirResponse{Err: errRO}, nil
 	}
+	if !validPath(req.GetName()) {
+		return &pb.MkdirResponse{Err: errBadPath}, nil
+	}
 	err := os.Mkdir(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())), os.FileMode(req.GetMode()))
 	return &pb.MkdirResponse{
 		Err: mapError(err),
@@ -244,6 +253,9 @@ func (s *Server) handleMkdirRequest(req *pb.MkdirRequest) (proto.Message, error)
 }
 
 func (s *Server) handleOpenRequest(req *pb.OpenRequest) (proto.Message, error) {
+	if !validPath(req.GetName()) {
+		return &pb.OpenResponse{Err: errBadPath}, nil
+	}
 	// TODO: look at flags and return errRO earlier, instead of at the write later.
 	var f *os.File
 	var err error
@@ -287,8 +299,12 @@ func (s *Server) handleReadRequest(req *pb.ReadRequest) (proto.Message, error) {
 }
 
 func (s *Server) handleReaddirRequest(req *pb.ReaddirRequest) (proto.Message, error) {
-	f, err := os.Open(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())))
 	res := new(pb.ReaddirResponse)
+	if !validPath(req.GetName()) {
+		res.Err = errBadPath
+		return res, nil
+	}
+	f, err := os.Open(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())))
 	if err != nil {
 		res.Err = mapError(err)
 		return res, nil
@@ -310,8 +326,12 @@ func (s *Server) handleReaddirRequest(req *pb.ReaddirRequest) (proto.Message, er
 }
 
 func (s *Server) handleReadlinkRequest(req *pb.ReadlinkRequest) (proto.Message, error) {
-	target, err := os.Readlink(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())))
 	res := new(pb.ReadlinkResponse)
+	if !validPath(req.GetName()) {
+		res.Err = errBadPath
+		return res, nil
+	}
+	target, err := os.Readlink(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())))
 	if err != nil {
 		res.Err = mapError(err)
 		return res, nil
@@ -321,19 +341,26 @@ func (s *Server) handleReadlinkRequest(req *pb.ReadlinkRequest) (proto.Message, 
 }
 
 func (s *Server) handleRenameRequest(req *pb.RenameRequest) (proto.Message, error) {
+	res := new(pb.RenameResponse)
 	if !s.vol.Writable {
 		return &pb.RenameResponse{Err: errRO}, nil
 	}
+	if !validPath(req.GetName()) {
+		res.Err = errBadPath
+		return res, nil
+	}
 	err := os.Rename(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())),
 		filepath.Join(s.vol.Root, filepath.FromSlash(req.GetTarget())))
-	return &pb.RenameResponse{
-		Err: mapError(err),
-	}, nil
+	res.Err = mapError(err)
+	return res, nil
 }
 
 func (s *Server) handleRmdirRequest(req *pb.RmdirRequest) (proto.Message, error) {
 	if !s.vol.Writable {
 		return &pb.RmdirResponse{Err: errRO}, nil
+	}
+	if !validPath(req.GetName()) {
+		return &pb.RmdirResponse{Err: errBadPath}, nil
 	}
 	path := filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName()))
 	fi, err := os.Lstat(path)
@@ -352,6 +379,9 @@ func (s *Server) handleSymlinkRequest(req *pb.SymlinkRequest) (proto.Message, er
 	if !s.vol.Writable {
 		return &pb.SymlinkResponse{Err: errRO}, nil
 	}
+	if !validPath(req.GetName()) {
+		return &pb.SymlinkResponse{Err: errBadPath}, nil
+	}
 	err := os.Symlink(req.GetValue(), filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())))
 	return &pb.SymlinkResponse{
 		Err: mapError(err),
@@ -361,6 +391,9 @@ func (s *Server) handleSymlinkRequest(req *pb.SymlinkRequest) (proto.Message, er
 func (s *Server) handleUtimeRequest(req *pb.UtimeRequest) (proto.Message, error) {
 	if !s.vol.Writable {
 		return &pb.UtimeResponse{Err: errRO}, nil
+	}
+	if !validPath(req.GetName()) {
+		return &pb.UtimeResponse{Err: errBadPath}, nil
 	}
 	at := req.GetAtime()
 	mt := req.GetMtime()
@@ -375,6 +408,9 @@ func (s *Server) handleUtimeRequest(req *pb.UtimeRequest) (proto.Message, error)
 func (s *Server) handleUnlinkRequest(req *pb.UnlinkRequest) (proto.Message, error) {
 	if !s.vol.Writable {
 		return &pb.UnlinkResponse{Err: errRO}, nil
+	}
+	if !validPath(req.GetName()) {
+		return &pb.UnlinkResponse{Err: errBadPath}, nil
 	}
 	err := os.Remove(filepath.Join(s.vol.Root, filepath.FromSlash(req.GetName())))
 	return &pb.UnlinkResponse{
@@ -406,10 +442,8 @@ func (s *Server) handleTruncateRequest(req *pb.TruncateRequest) (proto.Message, 
 		}, nil
 	}
 	name := req.GetName()
-	if err := checkPath(name); err != nil {
-		return &pb.TruncateResponse{
-			Err: &pb.Error{Other: proto.String(err.Error())},
-		}, nil
+	if !validPath(name) {
+		return &pb.TruncateResponse{Err: errBadPath}, nil
 	}
 	err := os.Truncate(filepath.Join(s.vol.Root, filepath.FromSlash(name)), int64(req.GetSize()))
 	return &pb.TruncateResponse{
