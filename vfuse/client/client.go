@@ -1,7 +1,7 @@
 // The client binary owns the filesystem and runs on the host machine
 // (which may be Mac, Windows, Linux, etc) and responds to the dockerd
 // server (which is running FUSE, and always Linux).
-package main
+package client
 
 import (
 	"flag"
@@ -22,9 +22,6 @@ import (
 )
 
 var (
-	root    = flag.String("root", ".", "Directory to share.")
-	rw      = flag.Bool("writable", true, "whether -root is writable")
-	addr    = flag.String("addr", "localhost:4321", "dockerfs service address")
 	verbose = flag.Bool("verbose", false, "verbose debugging mode")
 )
 
@@ -66,6 +63,13 @@ type Server struct {
 	c   *vfuse.Client
 }
 
+func NewServer(conn net.Conn, root string, rw bool) *Server {
+	return &Server{
+		vol: NewVolume(root, rw),
+		c:   vfuse.NewClient(conn),
+	}
+}
+
 var (
 	errRO      = &pb.Error{ReadOnly: proto.Bool(true)}
 	errNotDir  = &pb.Error{NotDir: proto.Bool(true)}
@@ -77,21 +81,6 @@ func vlogf(format string, args ...interface{}) {
 		return
 	}
 	log.Printf("client: "+format, args...)
-}
-
-func main() {
-	flag.Parse()
-
-	conn, err := net.Dial("tcp", *addr)
-	if err != nil {
-		log.Panic(err)
-	}
-
-	srv := &Server{
-		vol: NewVolume(".", *rw),
-		c:   vfuse.NewClient(conn),
-	}
-	srv.Run()
 }
 
 func (s *Server) Run() {

@@ -1,12 +1,10 @@
-package main
+package server
 
 import (
 	"flag"
-	"io/ioutil"
+	"fmt"
 	"log"
 	"net"
-	"os"
-	"strconv"
 	"sync"
 	"time"
 
@@ -20,9 +18,7 @@ import (
 )
 
 var (
-	listenAddr = flag.String("listen", "7070", "Listen port or 'ip:port'.")
-	mount      = flag.String("mount", "", "Mount point. If empty, a temp directory is used.")
-	verbose    = flag.Bool("verbose", false, "verbose debugging mode")
+	verbose = flag.Bool("verbose", false, "verbose debugging mode")
 )
 
 func vlogf(format string, args ...interface{}) {
@@ -30,57 +26,6 @@ func vlogf(format string, args ...interface{}) {
 		return
 	}
 	log.Printf("server: "+format, args...)
-}
-
-func main() {
-	flag.Parse()
-	if flag.NArg() > 0 {
-		log.Fatalf("No args supported.")
-	}
-	if *mount == "" {
-		var err error
-		*mount, err = ioutil.TempDir("", "vfused-tmp")
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer os.Remove(*mount)
-	}
-	if _, err := strconv.Atoi(*listenAddr); err == nil {
-		*listenAddr = ":" + *listenAddr
-	}
-	ln, err := net.Listen("tcp", *listenAddr)
-	if err != nil {
-		log.Fatalf("Listen: %v", err)
-	}
-
-	opts := &fuse.MountOptions{
-		Name: "vfuse_SOMECLIENT",
-	}
-	_ = opts
-	fs := NewFS(ln)
-
-	nfs := pathfs.NewPathNodeFs(fs, nil)
-
-	log.Printf("Mounting at %s", *mount)
-	srv, fsConnector, err := nodefs.MountRoot(*mount, nfs.Root(), nil)
-	if err != nil {
-		log.Fatalf("NewServer: %v", err)
-	}
-	_ = fsConnector
-
-	go srv.Serve()
-
-	log.Printf("Press 'q'+<enter> to exit.")
-	var buf [1]byte
-	for {
-		_, err := os.Stdin.Read(buf[:])
-		if err != nil || buf[0] == 'q' {
-			break
-		}
-	}
-	log.Printf("Got key, unmounting.")
-	srv.Unmount()
-	log.Printf("Unmounted, quitting.")
 }
 
 func fuseError(err *pb.Error) fuse.Status {
@@ -104,6 +49,36 @@ func pbTime(t *time.Time) *pb.Time {
 	sec := t.Unix()
 	nsec := int32(t.Nanosecond())
 	return &pb.Time{Sec: &sec, Nsec: &nsec}
+}
+
+type Server struct {
+	*fuse.Server
+	Connector *nodefs.FileSystemConnector
+}
+
+func NewServer(listenAddr, mount string) (*Server, error) {
+	ln, err := net.Listen("tcp", listenAddr)
+	if err != nil {
+		return nil, fmt.Errorf("Listen: %v", err)
+	}
+
+	opts := &fuse.MountOptions{
+		Name: "vfuse_SOMECLIENT",
+	}
+	_ = opts
+	fs := NewFS(ln)
+
+	nfs := pathfs.NewPathNodeFs(fs, nil)
+
+	log.Printf("Mounting at %s", mount)
+	srv, fsConnector, err := nodefs.MountRoot(mount, nfs.Root(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("NewServer: %v", err)
+	}
+	return &Server{
+		Server:    srv,
+		Connector: fsConnector,
+	}, nil
 }
 
 type FS struct {

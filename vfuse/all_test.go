@@ -153,8 +153,8 @@ func newWorld(t *testing.T) *world {
 	if err != nil {
 		t.Fatalf("vfused build failure: %v, %s", err, out)
 	}
-	vclient := filepath.Join(w.binDir, "vclient")
-	out, err = exec.Command("go", "build", "-o", vclient, "github.com/dotcloud/docker/vfuse/client").CombinedOutput()
+	vclient := filepath.Join(w.binDir, "vfusec")
+	out, err = exec.Command("go", "build", "-o", vclient, "github.com/dotcloud/docker/vfuse/vfusec").CombinedOutput()
 	if err != nil {
 		t.Fatalf("client build failure: %v, %s", err, out)
 	}
@@ -183,7 +183,7 @@ func newWorld(t *testing.T) *world {
 		time.Sleep(10 * time.Millisecond)
 	}
 	if !isMounted(w.mountDir) {
-		t.Fatal("never saw %s get mounted", w.mountDir)
+		t.Fatalf("never saw %s get mounted", w.mountDir)
 	}
 
 	w.client = exec.Command(vclient,
