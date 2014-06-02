@@ -1,3 +1,5 @@
+// vfusec is the vfuse client: it connects to a vfuse daemon and
+// replay filesystem operations on a given root directory.
 package main
 
 import (

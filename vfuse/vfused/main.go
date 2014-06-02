@@ -1,3 +1,5 @@
+// vfused is the vfuse daemon: it forward to its client all the
+// filesystem operations done on a given mount point.
 package main
 
 import (
