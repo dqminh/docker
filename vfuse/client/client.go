@@ -1,10 +1,9 @@
-// The client binary owns the filesystem and runs on the host machine
+// Package client owns the filesystem and runs on the host machine
 // (which may be Mac, Windows, Linux, etc) and responds to the dockerd
 // server (which is running FUSE, and always Linux).
 package client
 
 import (
-	"flag"
 	"fmt"
 	"log"
 	"net"
@@ -21,9 +20,7 @@ import (
 	"code.google.com/p/goprotobuf/proto"
 )
 
-var (
-	verbose = flag.Bool("verbose", false, "verbose debugging mode")
-)
+var Verbose bool
 
 type Volume struct {
 	Root     string
@@ -77,7 +74,7 @@ var (
 )
 
 func vlogf(format string, args ...interface{}) {
-	if !*verbose {
+	if !Verbose {
 		return
 	}
 	log.Printf("client: "+format, args...)

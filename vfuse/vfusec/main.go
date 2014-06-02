@@ -9,9 +9,10 @@ import (
 )
 
 var (
-	root = flag.String("root", ".", "Directory to share.")
-	rw   = flag.Bool("writable", true, "whether -root is writable")
-	addr = flag.String("addr", "localhost:4321", "dockerfs service address")
+	root    = flag.String("root", ".", "Directory to share.")
+	rw      = flag.Bool("writable", true, "whether -root is writable")
+	addr    = flag.String("addr", "localhost:4321", "dockerfs service address")
+	verbose = flag.Bool("verbose", false, "verbose debugging mode")
 )
 
 func main() {
@@ -21,6 +22,7 @@ func main() {
 	if err != nil {
 		log.Panic(err)
 	}
+	client.Verbose = *verbose
 
 	srv := client.NewServer(conn, *root, *rw)
 	srv.Run()

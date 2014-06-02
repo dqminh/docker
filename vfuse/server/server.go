@@ -1,7 +1,9 @@
+// Package server initialize a FUSE filesystem and relays all its
+// operations to the client over a TCP connection.
+
 package server
 
 import (
-	"flag"
 	"fmt"
 	"log"
 	"net"
@@ -17,12 +19,10 @@ import (
 	"github.com/hanwen/go-fuse/fuse/pathfs"
 )
 
-var (
-	verbose = flag.Bool("verbose", false, "verbose debugging mode")
-)
+var Verbose bool
 
 func vlogf(format string, args ...interface{}) {
-	if !*verbose {
+	if !Verbose {
 		return
 	}
 	log.Printf("server: "+format, args...)

@@ -13,6 +13,7 @@ import (
 var (
 	listenAddr = flag.String("listen", "7070", "Listen port or 'ip:port'.")
 	mount      = flag.String("mount", "", "Mount point. If empty, a temp directory is used.")
+	verbose    = flag.Bool("verbose", false, "verbose debugging mode")
 )
 
 func main() {
@@ -31,6 +32,7 @@ func main() {
 	if _, err := strconv.Atoi(*listenAddr); err == nil {
 		*listenAddr = ":" + *listenAddr
 	}
+	server.Verbose = *verbose
 
 	srv, err := server.NewServer(*listenAddr, *mount)
 	if err != nil {
