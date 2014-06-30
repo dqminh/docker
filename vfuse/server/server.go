@@ -258,6 +258,7 @@ func (fs *FS) Open(name string, flags uint32, context *fuse.Context) (nodefs.Fil
 	if !ok {
 		return nil, fuse.EIO
 	}
+	vlogf("Open(%q, flags %d) = %v", name, flags, res)
 	if res.Err != nil {
 		return nil, fuseError(res.Err)
 	}
