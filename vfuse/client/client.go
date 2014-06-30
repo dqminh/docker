@@ -256,15 +256,17 @@ func (s *Server) handleOpenRequest(req *pb.OpenRequest) (proto.Message, error) {
 	if !validPath(req.GetName()) {
 		return &pb.OpenResponse{Err: errBadPath}, nil
 	}
+	name := filepath.Join(s.vol.Root, req.GetName())
+
 	// TODO: look at flags and return errRO earlier, instead of at the write later.
 	var f *os.File
 	var err error
 	flags := int(req.GetFlags())
 	if flags != 0 {
 		// TODO: May be wrong perm usage
-		f, err = os.OpenFile(req.GetName(), flags, 0)
+		f, err = os.OpenFile(name, flags, 0)
 	} else {
-		f, err = os.Open(req.GetName())
+		f, err = os.Open(name)
 	}
 	if err != nil {
 		return &pb.OpenResponse{Err: mapError(err)}, nil
