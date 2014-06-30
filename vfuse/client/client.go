@@ -147,7 +147,11 @@ func mapError(err error) *pb.Error {
 }
 
 func validPath(p string) bool {
-	if p == "" || filepath.IsAbs(p) || p != path.Clean(p) {
+	if p == "" {
+		// The root.
+		return true
+	}
+	if filepath.IsAbs(p) || p != path.Clean(p) {
 		return false
 	}
 	return true
