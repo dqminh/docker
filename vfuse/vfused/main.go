@@ -6,6 +6,7 @@ import (
 	"flag"
 	"io/ioutil"
 	"log"
+	"net"
 	"os"
 	"strconv"
 
@@ -36,7 +37,23 @@ func main() {
 	}
 	server.Verbose = *verbose
 
-	srv, err := server.NewServer(*listenAddr, *mount)
+	connc := make(chan net.Conn, 1)
+	ln, err := net.Listen("tcp", *listenAddr)
+	if err != nil {
+		log.Fatalf("Listen: %v", err)
+	}
+	go func() {
+		defer ln.Close()
+		c, err := ln.Accept()
+		if err != nil {
+			log.Fatalf("Error accepting conn: %v", err)
+		}
+		connc <- c
+	}()
+
+	srv, err := server.NewServer(*mount, func() net.Conn {
+		return <-connc
+	})
 	if err != nil {
 		log.Fatalf("error creating server: %v", err)
 	}

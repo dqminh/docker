@@ -51,23 +51,26 @@ func pbTime(t *time.Time) *pb.Time {
 	return &pb.Time{Sec: &sec, Nsec: &nsec}
 }
 
+// Server is the FUSE filesystem that relays all operations back to
+// the client.
 type Server struct {
 	*fuse.Server
 	Connector *nodefs.FileSystemConnector
 }
 
-func NewServer(listenAddr, mount string) (*Server, error) {
-	ln, err := net.Listen("tcp", listenAddr)
-	if err != nil {
-		return nil, fmt.Errorf("Listen: %v", err)
-	}
-
+// NewServer runs a relaying FUSE filesystem at mount.
+// The provided clientConn function is called at most once
+// and should return a connection connected to the client.
+// In practice (in Dockerd) this net.Conn will be hijacked
+// from an HTTP request when the client goes to attach
+// to a filesystem.
+func NewServer(mount string, clientConn func() net.Conn) (*Server, error) {
 	opts := &fuse.MountOptions{
 		Name: "vfuse_SOMECLIENT",
 	}
 	_ = opts
-	fs := NewFS(ln)
 
+	fs := newFS(clientConn)
 	nfs := pathfs.NewPathNodeFs(fs, nil)
 
 	log.Printf("Mounting at %s", mount)
@@ -81,43 +84,39 @@ func NewServer(listenAddr, mount string) (*Server, error) {
 	}, nil
 }
 
+// FS is the implementation of the the pathfs.FileSystem interface.
+// It relays all its operations back to the client.
+// See http://godoc.org/github.com/hanwen/go-fuse/fuse/pathfs#FileSystem
 type FS struct {
 	pathfs.FileSystem
-	ln net.Listener
-	c  net.Conn
-	vc *vfuse.Client
 
-	clientOnce sync.Once
+	clientOnce sync.Once       // guards calling (*FS).initClient
+	clientConn func() net.Conn // called once in initClient
+	vc         *vfuse.Client
 
 	mu     sync.Mutex // guards the following fields
 	nextid uint64
 	res    map[uint64]chan<- proto.Message
 }
 
-func NewFS(ln net.Listener) *FS {
+func newFS(clientConn func() net.Conn) *FS {
 	return &FS{
 		FileSystem: pathfs.NewDefaultFileSystem(),
-		ln:         ln,
+		clientConn: clientConn,
 		res:        make(map[uint64]chan<- proto.Message),
 	}
 }
 
-func (fs *FS) getClient() {
-	vlogf("server: getClient")
-	c, err := fs.ln.Accept()
-	if err != nil {
-		log.Fatalf("Error accepting conn: %v", err)
-		return
-	}
-	fs.ln.Close()
-	fs.c = c
+func (fs *FS) initClient() {
+	vlogf("server: initClient")
+	c := fs.clientConn()
+	vlogf("server: init got client %v from %v", c, c.RemoteAddr())
 	fs.vc = vfuse.NewClient(c)
 	go fs.readFromClient()
-	vlogf("server: init got client %v from %v", c, c.RemoteAddr())
 }
 
 func (fs *FS) sendPacket(body proto.Message) (<-chan proto.Message, error) {
-	fs.clientOnce.Do(fs.getClient)
+	fs.clientOnce.Do(fs.initClient)
 	id, resc := fs.nextID()
 	if err := fs.vc.WritePacket(vfuse.Packet{
 		Header: vfuse.Header{
@@ -144,7 +143,8 @@ func (fs *FS) readFromClient() {
 	for {
 		p, err := fs.vc.ReadPacket()
 		if err != nil {
-			log.Fatalf("server: client disconnected or something: %v", err)
+			log.Printf("fuse server: error reading client packet: %v", err)
+			return
 		}
 		id := p.Header.ID
 		fs.mu.Lock()
@@ -154,7 +154,8 @@ func (fs *FS) readFromClient() {
 		}
 		fs.mu.Unlock()
 		if !ok {
-			log.Fatalf("Client sent bogus packet we didn't ask for")
+			log.Printf("fuse server: client sent bogus packet we didn't ask for; aborting")
+			return
 		}
 		resc <- p.Body
 	}
