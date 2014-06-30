@@ -185,6 +185,18 @@ func (fs *FS) Chmod(name string, mode uint32, context *fuse.Context) fuse.Status
 func (fs *FS) GetAttr(name string, context *fuse.Context) (*fuse.Attr, fuse.Status) {
 	vlogf("fs.GetAttr(%q)", name)
 
+	// Docker stats this before it returns to the client the filesystem ID.
+	// So fake stat of the root:
+	if name == "" {
+		const S_IFDIR = 0x4000
+		return &fuse.Attr{
+			Mode:    0755 | S_IFDIR,
+			Nlink:   1,
+			Blksize: 1024,
+			Blocks:  1,
+		}, fuse.OK
+	}
+
 	resc, err := fs.sendPacket(&pb.AttrRequest{
 		Name: &name,
 	})
