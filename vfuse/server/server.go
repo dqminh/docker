@@ -275,17 +275,21 @@ func (fs *FS) Open(name string, flags uint32, context *fuse.Context) (nodefs.Fil
 }
 
 func (fs *FS) OpenDir(name string, context *fuse.Context) (stream []fuse.DirEntry, code fuse.Status) {
-	vlogf("fs.OpenDir(%q)", name)
+	vlogf("fs.OpenDir(%q) ...", name)
 	resc, err := fs.sendPacket(&pb.ReaddirRequest{
 		Name: &name,
 	})
 	if err != nil {
+		vlogf("OpenDir error = %v", err)
 		return nil, fuse.EIO
 	}
-	res, ok := (<-resc).(*pb.ReaddirResponse)
+	resi := <-resc
+	res, ok := resi.(*pb.ReaddirResponse)
 	if !ok {
+		vlogf("OpenDir type error; was %T", resi)
 		return nil, fuse.EIO
 	}
+	vlogf("fs.OpenDir(%q) = %v", name, res)
 	stream = make([]fuse.DirEntry, len(res.Entry))
 	for i, ent := range res.Entry {
 		stream[i] = fuse.DirEntry{
