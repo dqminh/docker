@@ -1,5 +1,7 @@
 // Integration tests for vfuse client & server.
 
+// +build linux
+
 package vfuse
 
 import (
