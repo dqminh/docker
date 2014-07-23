@@ -17,6 +17,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 
 	"code.google.com/p/go.net/websocket"
@@ -657,6 +658,49 @@ func postImagesLoad(eng *engine.Engine, version version.Version, w http.Response
 	return job.Run()
 }
 
+var (
+	fsRelayConnsMu sync.Mutex
+	fsRelayConns   = map[string]*net.TCPConn{}
+)
+
+func TakeRelayConn(handle string) *net.TCPConn {
+	log.Debugf("TakeRelayConn -> handle: %s", handle)
+	fsRelayConnsMu.Lock()
+	defer fsRelayConnsMu.Unlock()
+	c := fsRelayConns[handle]
+	delete(fsRelayConns, handle)
+	log.Debugf("<- TakeRelayConn %v", c)
+	return c
+}
+
+func postFSRelay(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	if vars == nil {
+		return fmt.Errorf("Missing parameter")
+	}
+
+	conn, _, err := w.(http.Hijacker).Hijack()
+	if err != nil {
+		return err
+	}
+
+	tcp, ok := conn.(*net.TCPConn)
+	if !ok {
+		log.Errorf("Not a TCP connection, %T", conn)
+		conn.Close()
+		return nil
+	}
+
+	fmt.Fprintf(conn, "HTTP/1.1 101 Switching Protocols\r\nContent-Type: application/fuse\r\n\r\n")
+	addr := fmt.Sprintf("%x", tcp)
+
+	log.Debugf("Registering conn from %s", addr)
+	fsRelayConnsMu.Lock()
+	fsRelayConns[addr] = tcp
+	fsRelayConnsMu.Unlock()
+	log.Debugf("postFSRelay call job %s %s", vars["id"], addr)
+	return eng.Job("fs_relay", vars["id"], addr).Run()
+}
+
 func postContainersCreate(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
 	if err := parseForm(r); err != nil {
 		return nil
@@ -750,8 +794,10 @@ func postContainersStart(eng *engine.Engine, version version.Version, w http.Res
 		return fmt.Errorf("Missing parameter")
 	}
 	var (
-		name = vars["name"]
-		job  = eng.Job("start", name)
+		name         = vars["name"]
+		stdoutBuffer = new(bytes.Buffer)
+		job          = eng.Job("start", name)
+		env          engine.Env
 	)
 
 	// If contentLength is -1, we can assumed chunked encoding
@@ -770,6 +816,8 @@ func postContainersStart(eng *engine.Engine, version version.Version, w http.Res
 		}
 	}
 
+	job.Stdout.Add(stdoutBuffer)
+
 	if err := job.Run(); err != nil {
 		if err.Error() == "Container already started" {
 			w.WriteHeader(http.StatusNotModified)
@@ -777,8 +825,8 @@ func postContainersStart(eng *engine.Engine, version version.Version, w http.Res
 		}
 		return err
 	}
-	w.WriteHeader(http.StatusNoContent)
-	return nil
+	env.Set("FSRelayHandle", engine.Tail(stdoutBuffer, 1))
+	return writeJSON(w, http.StatusOK, env)
 }
 
 func postContainersStop(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
@@ -1285,6 +1333,7 @@ func createRouter(eng *engine.Engine, logging, enableCors bool, dockerVersion st
 			"/containers/{name:.*}/exec":    postContainerExecCreate,
 			"/exec/{name:.*}/start":         postContainerExecStart,
 			"/exec/{name:.*}/resize":        postContainerExecResize,
+			"/fs/{id:.*}/relay":             postFSRelay,
 		},
 		"DELETE": {
 			"/containers/{name:.*}": deleteContainers,

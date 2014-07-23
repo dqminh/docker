@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"os"
 	"path"
 	"regexp"
@@ -98,6 +99,9 @@ type Daemon struct {
 	driver         graphdriver.Driver
 	execDriver     execdriver.Driver
 	trustStore     *trust.TrustStore
+
+	// store the fuse connections
+	fsHandlers map[string]chan<- net.Conn
 }
 
 // Install installs daemon capabilities to eng.
@@ -128,6 +132,7 @@ func (daemon *Daemon) Install(eng *engine.Engine) error {
 		"execCreate":        daemon.ContainerExecCreate,
 		"execStart":         daemon.ContainerExecStart,
 		"execResize":        daemon.ContainerExecResize,
+		"fsRelay":           daemon.ContainerFSRelay,
 	} {
 		if err := eng.Register(name, method); err != nil {
 			return err
@@ -910,6 +915,10 @@ func NewDaemonFromDirectory(config *Config, eng *engine.Engine) (*Daemon, error)
 		execDriver:     ed,
 		eng:            eng,
 		trustStore:     t,
+		fsHandlers:     make(map[string]chan<- net.Conn),
+	}
+	if err := daemon.checkLocaldns(); err != nil {
+		return nil, err
 	}
 	if err := daemon.restore(); err != nil {
 		return nil, err

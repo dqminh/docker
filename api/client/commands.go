@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"os"
 	"os/exec"
@@ -38,6 +39,7 @@ import (
 	"github.com/docker/docker/pkg/term"
 	"github.com/docker/docker/pkg/timeutils"
 	"github.com/docker/docker/pkg/units"
+	vfuse "github.com/docker/docker/pkg/vfuse/client"
 	"github.com/docker/docker/registry"
 	"github.com/docker/docker/runconfig"
 	"github.com/docker/docker/utils"
@@ -2275,8 +2277,46 @@ func (cli *DockerCli) CmdRun(args ...string) error {
 	}
 
 	//start the container
-	if _, _, err = readBody(cli.call("POST", "/containers/"+runResult.Get("Id")+"/start", hostConfig, false)); err != nil {
+	stream, _, err = cli.call("POST", "/containers/"+runResult.Get("Id")+"/start", hostConfig, false)
+	if err != nil {
 		return err
+	}
+
+	var out engine.Env
+	if err := out.Decode(stream); err != nil {
+		return err
+	}
+
+	log.Debugf("FSRelayHandle: %s", out.Get("FSRelayHandle"))
+
+	if handle := out.Get("FSRelayHandle"); handle != "" {
+		req, err := http.NewRequest("POST", fmt.Sprintf("/v%s/fs/%s/relay", api.APIVERSION, handle), nil)
+		if err != nil {
+			return err
+		}
+		req.Host = cli.addr
+		dial, err := cli.dial()
+		if err != nil {
+			return err
+		}
+		clientconn := httputil.NewClientConn(dial, nil)
+		defer clientconn.Close()
+
+		// Server hijacks the connection, error 'connection closed' expected
+		resp, err := clientconn.Do(req)
+		if err != nil {
+			return err
+		}
+
+		if resp.StatusCode != 101 {
+			return fmt.Errorf("Unexpected status: %s", resp.Status)
+		}
+
+		rwc, _ := clientconn.Hijack()
+
+		s := vfuse.NewServer(rwc, os.Getenv("FUSE_PATH"), false)
+		go s.Run()
+
 	}
 
 	if (config.AttachStdin || config.AttachStdout || config.AttachStderr) && config.Tty && cli.isTerminalOut {

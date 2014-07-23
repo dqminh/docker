@@ -13,6 +13,7 @@ import (
 	"github.com/docker/docker/api/client"
 	"github.com/docker/docker/dockerversion"
 	flag "github.com/docker/docker/pkg/mflag"
+	vfuse "github.com/docker/docker/pkg/vfuse/server"
 	"github.com/docker/docker/reexec"
 	"github.com/docker/docker/utils"
 )
@@ -37,6 +38,7 @@ func main() {
 	}
 	if *flDebug {
 		os.Setenv("DEBUG", "1")
+		vfuse.Verbose = true
 	}
 
 	if len(flHosts) == 0 {
