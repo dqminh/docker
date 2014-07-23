@@ -11,7 +11,7 @@ import (
 	"sync"
 
 	"code.google.com/p/goprotobuf/proto"
-	"github.com/dotcloud/docker/vfuse/pb"
+	"github.com/dotcloud/docker/pkg/vfuse/pb"
 )
 
 type PacketType uint32

@@ -10,10 +10,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dotcloud/docker/vfuse/pb"
+	"github.com/dotcloud/docker/pkg/vfuse"
+	"github.com/dotcloud/docker/pkg/vfuse/pb"
 
 	"code.google.com/p/goprotobuf/proto"
-	"github.com/dotcloud/docker/vfuse"
 	"github.com/hanwen/go-fuse/fuse"
 	"github.com/hanwen/go-fuse/fuse/nodefs"
 	"github.com/hanwen/go-fuse/fuse/pathfs"
