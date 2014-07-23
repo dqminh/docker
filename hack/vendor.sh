@@ -47,11 +47,15 @@ clone git github.com/gorilla/mux 136d54f81f
 
 clone git github.com/tchap/go-patricia v1.0.1
 
+clone git github.com/hanwen/go-fuse df17f4147024
+
 clone hg code.google.com/p/go.net 84a4013f96e0
 
 clone hg code.google.com/p/gosqlite 74691fb6f837
 
 clone git github.com/docker/libtrust d273ef2565ca
+
+clone hg code.google.com/p/goprotobuf f5ac12b15e49
 
 # get Go tip's archive/tar, for xattr support and improved performance
 # TODO after Go 1.4 drops, bump our minimum supported version and drop this vendored dep
