@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"bytes"
 	"testing"
 )
 
@@ -34,5 +35,18 @@ func TestProgress(t *testing.T) {
 	jp4 := JSONProgress{Current: 50, Total: 40}
 	if jp4.String() != expected {
 		t.Fatalf("Expected %q, got %q", expected, jp4.String())
+	}
+}
+
+func TestDisplayJSONMessagesStream(t *testing.T) {
+	// do not print a new line for progress data in non-terminal mode
+	in := bytes.NewBufferString(`{
+		"ID":"asdf",
+		"progressDetail":{"current":50,"total":100}
+	}`)
+	out := bytes.NewBuffer(nil)
+	DisplayJSONMessagesStream(in, out, 0, false)
+	if out.String() != "" {
+		t.Errorf("Output(%s) mismatched, expected empty", out.String())
 	}
 }

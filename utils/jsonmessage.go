@@ -93,7 +93,7 @@ func (jm *JSONMessage) Display(out io.Writer, isTerminal bool) error {
 		return jm.Error
 	}
 	var endl string
-	if isTerminal && jm.Stream == "" && jm.Progress != nil {
+	if isTerminal && jm.Stream == "" {
 		// <ESC>[2K = erase entire current line
 		fmt.Fprintf(out, "%c[2K\r", 27)
 		endl = "\r"
@@ -116,7 +116,11 @@ func (jm *JSONMessage) Display(out io.Writer, isTerminal bool) error {
 	} else if jm.Stream != "" {
 		fmt.Fprintf(out, "%s%s", jm.Stream, endl)
 	} else {
-		fmt.Fprintf(out, "%s%s\n", jm.Status, endl)
+		if isTerminal {
+			fmt.Fprintf(out, "%s%s", jm.Status, endl)
+		} else {
+			fmt.Fprintf(out, "%s%s\n", jm.Status, endl)
+		}
 	}
 	return nil
 }
@@ -139,7 +143,7 @@ func DisplayJSONMessagesStream(in io.Reader, out io.Writer, terminalFd uintptr, 
 		if jm.Progress != nil {
 			jm.Progress.terminalFd = terminalFd
 		}
-		if jm.ID != "" && (jm.Progress != nil || jm.ProgressMessage != "") {
+		if jm.ID != "" && isTerminal {
 			line, ok := ids[jm.ID]
 			if !ok {
 				line = len(ids)
@@ -149,10 +153,8 @@ func DisplayJSONMessagesStream(in io.Reader, out io.Writer, terminalFd uintptr, 
 			} else {
 				diff = len(ids) - line
 			}
-			if jm.ID != "" && isTerminal {
-				// <ESC>[{diff}A = move cursor up diff rows
-				fmt.Fprintf(out, "%c[%dA", 27, diff)
-			}
+			// <ESC>[{diff}A = move cursor up diff rows
+			fmt.Fprintf(out, "%c[%dA", 27, diff)
 		}
 		err := jm.Display(out, isTerminal)
 		if jm.ID != "" && isTerminal {
