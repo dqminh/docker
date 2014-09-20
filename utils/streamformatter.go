@@ -56,21 +56,23 @@ func (sf *StreamFormatter) FormatError(err error) []byte {
 }
 
 func (sf *StreamFormatter) FormatProgress(id, action string, progress *JSONProgress) []byte {
-	if progress == nil {
-		progress = &JSONProgress{}
-	}
 	if sf.json {
-
-		b, err := json.Marshal(&JSONMessage{
-			Status:          action,
-			ProgressMessage: progress.String(),
-			Progress:        progress,
-			ID:              id,
-		})
+		msg := &JSONMessage{
+			Status: action,
+			ID:     id,
+		}
+		if progress != nil {
+			msg.Progress = progress
+			msg.ProgressMessage = progress.String()
+		}
+		b, err := json.Marshal(msg)
 		if err != nil {
 			return nil
 		}
 		return b
+	}
+	if progress == nil {
+		progress = &JSONProgress{}
 	}
 	endl := "\r"
 	if progress.String() == "" {
