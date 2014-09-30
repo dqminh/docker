@@ -7,7 +7,7 @@ import (
 	"log"
 	"net"
 
-	"github.com/dotcloud/docker/vfuse/client"
+	"github.com/docker/docker/pkg/vfuse/client"
 )
 
 var (

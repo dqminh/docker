@@ -2,9 +2,15 @@ package daemon
 
 import (
 	"net"
+	"sync"
 
 	"github.com/docker/docker/engine"
 	"github.com/docker/docker/pkg/log"
+)
+
+var (
+	fsRelayConnsMu sync.Mutex
+	fsRelayConns   = map[string]*net.TCPConn{}
 )
 
 func (daemon *Daemon) ContainerFSRelay(job *engine.Job) engine.Status {
@@ -13,8 +19,8 @@ func (daemon *Daemon) ContainerFSRelay(job *engine.Job) engine.Status {
 		return job.Errorf("Usage: %s fs_id, conn_handle", job.Name)
 	}
 
-	ch := daemon.FSHandlers[job.Args[0]]
-	delete(daemon.FSHandlers, job.Args[0])
+	ch := daemon.fsHandlers[job.Args[0]]
+	delete(daemon.fsHandlers, job.Args[0])
 
 	if ch == nil {
 		return job.Errorf("Unknown or duplicate FS handle")

@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	cryptorand "crypto/rand"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/docker/docker/engine"
 	"github.com/docker/docker/pkg/log"
+	vfuse "github.com/docker/docker/pkg/vfuse/server"
 	"github.com/docker/docker/runconfig"
 )
 
@@ -49,7 +51,7 @@ func (daemon *Daemon) ContainerStart(job *engine.Job) engine.Status {
 func (daemon *Daemon) setHostConfig(container *Container, hostConfig *runconfig.HostConfig) error {
 	// Validate the HostConfig binds. Make sure that:
 	// the source exists
-	for _, bind := range hostConfig.Binds {
+	for index, bind := range hostConfig.Binds {
 		splitBind := strings.Split(bind, ":")
 		source := splitBind[0]
 		mountPoint := splitBind[1]

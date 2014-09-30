@@ -2277,7 +2277,7 @@ func (cli *DockerCli) CmdRun(args ...string) error {
 	}
 
 	//start the container
-	stream, _, err = cli.call("POST", "/containers/"+runResult.Get("Id")+"/start", hostConfig, false)
+	stream, _, err := cli.call("POST", "/containers/"+runResult.Get("Id")+"/start", hostConfig, false)
 	if err != nil {
 		return err
 	}

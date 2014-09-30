@@ -14,8 +14,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/dotcloud/docker/pkg/vfuse"
-	"github.com/dotcloud/docker/pkg/vfuse/pb"
+	"github.com/docker/docker/pkg/vfuse"
+	"github.com/docker/docker/pkg/vfuse/pb"
 
 	"code.google.com/p/goprotobuf/proto"
 )

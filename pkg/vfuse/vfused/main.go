@@ -10,7 +10,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/dotcloud/docker/vfuse/server"
+	"github.com/docker/docker/pkg/vfuse/server"
 )
 
 var (
