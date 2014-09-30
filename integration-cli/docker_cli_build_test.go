@@ -2242,10 +2242,10 @@ func TestBuildInvalidTag(t *testing.T) {
 	name := "abcd:A0123456789B0123456789C0123456789"
 	defer deleteImages(name)
 	_, out, err := buildImageWithOut(name, "FROM scratch\nMAINTAINER quux\n", true)
-	// if the error doesnt check for illegal tag name, or the image is built
+	// if the error doesnt check for illegal tag name, or the layers are built
 	// then this should fail
 	if !strings.Contains(err.Error(), "Illegal tag name") ||
-		strings.Contains(out, "Sending build context to Docker daemon") {
+		strings.Contains(out, "FROM scratch") {
 		t.Fatalf("failed to stop before building. Error: %s, Output: %s", err, out)
 	}
 	logDone("build - invalid tag")

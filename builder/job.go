@@ -10,6 +10,7 @@ import (
 	"github.com/docker/docker/archive"
 	"github.com/docker/docker/daemon"
 	"github.com/docker/docker/engine"
+	"github.com/docker/docker/graph"
 	"github.com/docker/docker/pkg/parsers"
 	"github.com/docker/docker/registry"
 	"github.com/docker/docker/utils"
@@ -43,6 +44,11 @@ func (b *BuilderJob) CmdBuild(job *engine.Job) engine.Status {
 	job.GetenvJson("authConfig", authConfig)
 	job.GetenvJson("configFile", configFile)
 	repoName, tag = parsers.ParseRepositoryTag(repoName)
+	if len(tag) > 0 {
+		if err := graph.ValidateTagName(tag); err != nil {
+			return job.Error(err)
+		}
+	}
 
 	if remoteURL == "" {
 		context = ioutil.NopCloser(job.Stdin)
