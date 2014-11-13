@@ -852,6 +852,12 @@ func postContainersAttach(eng *engine.Engine, version version.Version, w http.Re
 		return err
 	}
 
+	// preload cfg to make sure that we can call attach job ASAP because
+	// deserializing large config can be slow. This makes it less
+	// likely that there's a race between attach and jobs that alter the
+	// container's stream such as start
+	cfg := c.GetSubEnv("Config")
+
 	inStream, outStream, err := hijackServer(w)
 	if err != nil {
 		return err
@@ -875,7 +881,7 @@ func postContainersAttach(eng *engine.Engine, version version.Version, w http.Re
 
 	fmt.Fprintf(outStream, "HTTP/1.1 200 OK\r\nContent-Type: application/vnd.docker.raw-stream\r\n\r\n")
 
-	if c.GetSubEnv("Config") != nil && !c.GetSubEnv("Config").GetBool("Tty") && version.GreaterThanOrEqualTo("1.6") {
+	if cfg != nil && !cfg.GetBool("Tty") && version.GreaterThanOrEqualTo("1.6") {
 		errStream = stdcopy.NewStdWriter(outStream, stdcopy.Stderr)
 		outStream = stdcopy.NewStdWriter(outStream, stdcopy.Stdout)
 	} else {
