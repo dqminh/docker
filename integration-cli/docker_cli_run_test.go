@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"text/template"
 	"time"
 
 	"github.com/docker/docker/nat"
@@ -2509,6 +2510,52 @@ func TestRunSlowStdoutConsumer(t *testing.T) {
 	}
 
 	logDone("run - slow consumer")
+}
+
+// Regression test for #9021
+func TestRunSlowAttach(t *testing.T) {
+	defer deleteAllContainers()
+
+	// start building docker file with a large number of ports
+	portList := make([]string, 100)
+	line := make([]string, 100)
+	expectedPorts := make([]int, len(portList)*len(line))
+	for i := 0; i < len(portList); i++ {
+		for j := 0; j < len(line); j++ {
+			p := i*len(line) + j + 1
+			line[j] = strconv.Itoa(p)
+			expectedPorts[p-1] = p
+		}
+		if i == len(portList)-1 {
+			portList[i] = strings.Join(line, " ")
+		} else {
+			portList[i] = strings.Join(line, " ") + ` \`
+		}
+	}
+
+	dockerfile := `FROM busybox
+	EXPOSE {{range .}} {{.}}
+	{{end}}`
+	tmpl := template.Must(template.New("dockerfile").Parse(dockerfile))
+	buf := bytes.NewBuffer(nil)
+	tmpl.Execute(buf, portList)
+
+	name := "testslowattach"
+	defer deleteImages(name)
+	_, err := buildImage(name, buf.String(), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := exec.Command(dockerBinary, "run", "testslowattach", "echo", "hello")
+	out, _, err := runCommandWithOutputAndTimeout(cmd, 2*time.Second)
+	if err != nil {
+		t.Fatal(err, out)
+	}
+
+	if out != "hello\n" {
+		t.Fatalf("output(%s), expected hello", out)
+	}
 }
 
 func TestRunAllowPortRangeThroughExpose(t *testing.T) {
