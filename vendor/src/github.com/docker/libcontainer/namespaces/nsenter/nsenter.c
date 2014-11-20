@@ -16,6 +16,15 @@
 
 static const kBufSize = 256;
 static const char *kNsEnter = "nsenter";
+pid_t child;
+
+// forward the received signal to child
+void forward_signal(int sig)
+{
+	if (child > 0) {
+		kill(child, sig);
+	}
+}
 
 void get_args(int *argc, char ***argv)
 {
@@ -174,7 +183,7 @@ void nsenter()
 	}
 
 	// We must fork to actually enter the PID namespace.
-	int child = fork();
+	child = fork();
 	if (child == 0) {
 		if (consolefd != -1) {
 			if (dup2(consolefd, STDIN_FILENO) != 0) {
@@ -196,6 +205,44 @@ void nsenter()
 		// Finish executing, let the Go runtime take over.
 		return;
 	} else {
+		// forward all received signal to child
+		// list of signals taken docker/pkg/signal
+		signal(SIGABRT, forward_signal);
+		signal(SIGALRM, forward_signal);
+		signal(SIGBUS, forward_signal);
+		signal(SIGCHLD, forward_signal);
+		signal(SIGCLD, forward_signal);
+		signal(SIGCONT, forward_signal);
+		signal(SIGFPE, forward_signal);
+		signal(SIGHUP, forward_signal);
+		signal(SIGILL, forward_signal);
+		signal(SIGINT, forward_signal);
+		signal(SIGIO, forward_signal);
+		signal(SIGIOT, forward_signal);
+		signal(SIGKILL, forward_signal);
+		signal(SIGPIPE, forward_signal);
+		signal(SIGPOLL, forward_signal);
+		signal(SIGPROF, forward_signal);
+		signal(SIGPWR, forward_signal);
+		signal(SIGQUIT, forward_signal);
+		signal(SIGSEGV, forward_signal);
+		signal(SIGSTKFLT, forward_signal);
+		signal(SIGSTOP, forward_signal);
+		signal(SIGSYS, forward_signal);
+		signal(SIGTERM, forward_signal);
+		signal(SIGTRAP, forward_signal);
+		signal(SIGTSTP, forward_signal);
+		signal(SIGTTIN, forward_signal);
+		signal(SIGTTOU, forward_signal);
+		signal(SIGUNUSED, forward_signal);
+		signal(SIGURG, forward_signal);
+		signal(SIGUSR1, forward_signal);
+		signal(SIGUSR2, forward_signal);
+		signal(SIGVTALRM, forward_signal);
+		signal(SIGWINCH, forward_signal);
+		signal(SIGXCPU, forward_signal);
+		signal(SIGXFSZ, forward_signal);
+
 		// Parent, wait for the child.
 		int status = 0;
 		if (waitpid(child, &status, 0) == -1) {
