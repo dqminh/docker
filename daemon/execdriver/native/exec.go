@@ -39,7 +39,7 @@ func nsenterExec() {
 }
 
 // TODO(vishh): Add support for running in priviledged mode and running as a different user.
-func (d *driver) Exec(c *execdriver.Command, processConfig *execdriver.ProcessConfig, pipes *execdriver.Pipes, startCallback execdriver.StartCallback) (int, error) {
+func (d *driver) Exec(id string, c *execdriver.Command, processConfig *execdriver.ProcessConfig, pipes *execdriver.Pipes, startCallback execdriver.StartCallback) (int, error) {
 	active := d.activeContainers[c.ID]
 	if active == nil {
 		return -1, fmt.Errorf("No active container exists with ID %s", c.ID)
@@ -61,7 +61,7 @@ func (d *driver) Exec(c *execdriver.Command, processConfig *execdriver.ProcessCo
 
 	args := append([]string{processConfig.Entrypoint}, processConfig.Arguments...)
 
-	return namespaces.ExecIn(active.container, state, args, os.Args[0], "exec", processConfig.Stdin, processConfig.Stdout, processConfig.Stderr, processConfig.Console,
+	return namespaces.ExecIn(active.container, state, id, args, os.Args[0], "exec", processConfig.Stdin, processConfig.Stdout, processConfig.Stderr, processConfig.Console,
 		func(cmd *exec.Cmd) {
 			if startCallback != nil {
 				startCallback(&c.ProcessConfig, cmd.Process.Pid)
