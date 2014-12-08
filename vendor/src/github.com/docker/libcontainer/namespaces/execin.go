@@ -15,6 +15,8 @@ import (
 	"github.com/docker/libcontainer"
 	"github.com/docker/libcontainer/apparmor"
 	"github.com/docker/libcontainer/cgroups"
+	"github.com/docker/libcontainer/cgroups/fs"
+	"github.com/docker/libcontainer/cgroups/systemd"
 	"github.com/docker/libcontainer/label"
 	"github.com/docker/libcontainer/system"
 )
@@ -68,8 +70,17 @@ func ExecIn(container *libcontainer.Config, state *libcontainer.State, execID st
 		return -1, terr
 	}
 
-	// Enter cgroups.
-	if err := EnterCgroups(state, cmd.Process.Pid); err != nil {
+	// create a new nested cgroup for this process
+	cg := &cgroups.Cgroup{
+		Name:   "exec-" + execID,
+		Parent: container.Cgroups.Name,
+	}
+	if systemd.UseSystemd() {
+		_, err = systemd.Apply(cg, cmd.Process.Pid)
+	} else {
+		_, err = fs.Apply(cg, cmd.Process.Pid)
+	}
+	if err != nil {
 		return terminate(err)
 	}
 
