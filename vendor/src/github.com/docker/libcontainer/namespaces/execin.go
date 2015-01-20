@@ -115,12 +115,18 @@ func ExecIn(config *libcontainer.ExecConfig, userArgs []string, initPath, action
 }
 
 // StopExecIn stops all processes inside the current exec's cgroups.
-func StopExecIn(config *libcontainer.ExecConfig) error {
-	container := config.Container
-
+func StopExecIn(config *libcontainer.ExecConfig, pid int) error {
+	// if we dont specify the config here, kill the main process of the exec
+	// session. This ignores the background processes.
 	if config.Cgroups == nil {
-		return fmt.Errorf("removing exec processes in parent cgroups is not supported")
+		p, err := os.FindProcess(pid)
+		if err == nil {
+			return p.Kill()
+		}
+		// if failed to find the main proess, then consider it succesfully done
+		return nil
 	}
+	container := config.Container
 	config.Cgroups.Parent = filepath.Join(container.Cgroups.Parent, container.Cgroups.Name)
 	// get devices settings from the container
 	config.Cgroups.AllowedDevices = container.Cgroups.AllowedDevices
