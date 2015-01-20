@@ -114,6 +114,25 @@ func ExecIn(config *libcontainer.ExecConfig, userArgs []string, initPath, action
 	return cmd.ProcessState.Sys().(syscall.WaitStatus).ExitStatus(), nil
 }
 
+// StopExecIn stops all processes inside the current exec's cgroups.
+func StopExecIn(config *libcontainer.ExecConfig) error {
+	container := config.Container
+
+	if config.Cgroups == nil {
+		return fmt.Errorf("removing exec processes in parent cgroups is not supported")
+	}
+	config.Cgroups.Parent = filepath.Join(container.Cgroups.Parent, container.Cgroups.Name)
+	// get devices settings from the container
+	config.Cgroups.AllowedDevices = container.Cgroups.AllowedDevices
+	config.Cgroups.AllowAllDevices = container.Cgroups.AllowAllDevices
+
+	stopFn := fs.Stop
+	if systemd.UseSystemd() {
+		stopFn = systemd.Stop
+	}
+	return stopFn(config.Cgroups)
+}
+
 // Finalize expects that the setns calls have been setup and that is has joined an
 // existing namespace
 func FinalizeSetns(container *libcontainer.Config, args []string) error {
