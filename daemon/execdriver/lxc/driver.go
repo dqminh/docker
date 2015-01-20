@@ -527,5 +527,8 @@ func (d *driver) Exec(id string, c *execdriver.Command, processConfig *execdrive
 
 func (d *driver) Stats(id string) (*execdriver.ResourceStats, error) {
 	return nil, fmt.Errorf("container stats are not supported with LXC")
+}
 
+func (d *driver) StopExec(id string, c *execdriver.Command) error {
+	return ErrExec
 }

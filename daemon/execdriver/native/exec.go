@@ -74,3 +74,16 @@ func (d *driver) Exec(id string, c *execdriver.Command, processConfig *execdrive
 			}
 		})
 }
+
+func (d *driver) StopExec(id string, c *execdriver.Command) error {
+	active := d.activeContainers[c.ID]
+	if active == nil {
+		return fmt.Errorf("No active container exists with ID %s", c.ID)
+	}
+
+	execConfig := &libcontainer.ExecConfig{
+		Container: active.container,
+		Cgroups:   &cgroups.Cgroup{Name: id},
+	}
+	return namespaces.StopExecIn(execConfig)
+}

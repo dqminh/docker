@@ -55,6 +55,8 @@ type Driver interface {
 	Run(c *Command, pipes *Pipes, startCallback StartCallback) (ExitStatus, error) // Run executes the process and blocks until the process exits and returns the exit code
 	// Exec executes the process in an existing container, blocks until the process exits and returns the exit code
 	Exec(id string, c *Command, processConfig *ProcessConfig, pipes *Pipes, startCallback StartCallback) (int, error)
+	// StopExec stops the running exec process and its children given its id
+	StopExec(id string, c *Command) error
 	Kill(c *Command, sig int) error
 	Pause(c *Command) error
 	Unpause(c *Command) error
