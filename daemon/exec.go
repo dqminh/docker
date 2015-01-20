@@ -28,7 +28,9 @@ type execConfig struct {
 	OpenStdin  bool
 	OpenStderr bool
 	OpenStdout bool
+	UseCgroup  bool
 	Container  *Container
+	PID        int
 }
 
 type execStore struct {
@@ -146,6 +148,7 @@ func (d *Daemon) ContainerExecCreate(job *engine.Job) engine.Status {
 		OpenStdin:     config.AttachStdin,
 		OpenStdout:    config.AttachStdout,
 		OpenStderr:    config.AttachStderr,
+		UseCgroup:     config.UseCgroup,
 		StreamConfig:  StreamConfig{},
 		ProcessConfig: processConfig,
 		Container:     container,
@@ -272,9 +275,10 @@ func (d *Daemon) ContainerExecStop(job *engine.Job) engine.Status {
 		return job.Error(err)
 	}
 
-	log.Debugf("stopping exec command %s in container %s", execConfig.ID, execConfig.Container.ID)
+	log.Debugf("stopping exec command %s, pid: %d in container %s", execConfig.ID, execConfig.PID, execConfig.Container.ID)
 
-	if err := d.execDriver.StopExec(execConfig.ID, execConfig.Container.command); err != nil {
+	if err := d.execDriver.StopExec(execConfig.ID, execConfig.UseCgroup, execConfig.PID,
+		execConfig.Container.command); err != nil {
 		return job.Error(err)
 	}
 
@@ -283,7 +287,7 @@ func (d *Daemon) ContainerExecStop(job *engine.Job) engine.Status {
 
 // This is called by container#monitorExec
 func (d *Daemon) Exec(c *Container, execConfig *execConfig, pipes *execdriver.Pipes, startCallback execdriver.StartCallback) (int, error) {
-	exitStatus, err := d.execDriver.Exec(execConfig.ID, c.command, &execConfig.ProcessConfig, pipes, startCallback)
+	exitStatus, err := d.execDriver.Exec(execConfig.ID, execConfig.UseCgroup, c.command, &execConfig.ProcessConfig, pipes, startCallback)
 
 	// On err, make sure we don't leave ExitCode at zero
 	if err != nil && exitStatus == 0 {
@@ -307,6 +311,7 @@ func (container *Container) Exec(execConfig *execConfig) error {
 	waitStart := make(chan struct{})
 
 	callback := func(processConfig *execdriver.ProcessConfig, pid int) {
+		execConfig.PID = pid
 		if processConfig.Tty {
 			// The callback is called after the process Start()
 			// so we are in the parent process. In TTY mode, stdin/out/err is the PtySlave

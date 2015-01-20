@@ -43,7 +43,8 @@ func TestExecApiStop(t *testing.T) {
 	}
 
 	execID, err := startExec(name, map[string]interface{}{
-		"Cmd": []string{"top", "-b"},
+		"UseCgroup": true,
+		"Cmd":       []string{"top", "-b"},
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -17,6 +17,7 @@ type ExecConfig struct {
 	AttachStderr bool
 	AttachStdout bool
 	Detach       bool
+	UseCgroup    bool
 	Cmd          []string
 }
 
@@ -30,6 +31,7 @@ func ExecConfigFromJob(job *engine.Job) (*ExecConfig, error) {
 		AttachStdin:  job.GetenvBool("AttachStdin"),
 		AttachStderr: job.GetenvBool("AttachStderr"),
 		AttachStdout: job.GetenvBool("AttachStdout"),
+		UseCgroup:    job.GetenvBool("UseCgroup"),
 	}
 	cmd := job.GetenvList("Cmd")
 	if len(cmd) == 0 {
