@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/libcontainer/cgroups"
 	"github.com/docker/libcontainer/cgroups/fs"
 	"github.com/docker/libcontainer/cgroups/systemd"
@@ -189,6 +190,7 @@ func (l *LinuxFactory) StartInitialization(pipefd uintptr) (err error) {
 			// ensure that any data sent from the parent is consumed so it doesn't
 			// receive ECONNRESET when the child writes to the pipe.
 			ioutil.ReadAll(pipe)
+			logrus.Errorf("Error in initialization: %s", err)
 			if err := json.NewEncoder(pipe).Encode(newSystemError(err)); err != nil {
 				panic(err)
 			}

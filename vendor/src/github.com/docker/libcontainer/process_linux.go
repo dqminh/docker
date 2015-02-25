@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"syscall"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/libcontainer/cgroups"
 	"github.com/docker/libcontainer/system"
 )
@@ -70,11 +71,14 @@ func (p *setnsProcess) start() (err error) {
 // over the provided pipe.
 func (p *setnsProcess) execSetns() error {
 	err := p.cmd.Start()
+	logrus.Errorf("PID: %d", p.cmd.Process.Pid)
 	p.childPipe.Close()
 	if err != nil {
 		return newSystemError(err)
 	}
+	logrus.Errorf("Waiting for process in execSetns")
 	status, err := p.cmd.Process.Wait()
+	logrus.Errorf("process in execSetns finished")
 	if err != nil {
 		p.cmd.Wait()
 		return newSystemError(err)
