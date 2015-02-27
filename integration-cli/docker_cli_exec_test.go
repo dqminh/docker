@@ -60,7 +60,7 @@ func TestExecInteractiveStdinClose(t *testing.T) {
 
 		out, err := cmd.CombinedOutput()
 		if err != nil {
-			t.Fatal(err, out)
+			t.Fatal(err, string(out))
 		}
 
 		if string(out) == "" {

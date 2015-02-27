@@ -75,11 +75,13 @@ func (d *driver) Exec(c *execdriver.Command, processConfig *execdriver.ProcessCo
 
 	logrus.Errorf("Wait for process finished")
 	ps, err := p.Wait()
-	if err, ok := err.(*exec.ExitError); !ok {
-		logrus.Errorf("Error on running process: %s", err)
-		return -1, err
-	} else {
-		ps = err.ProcessState
+	if err != nil {
+		exitErr, ok := err.(*exec.ExitError)
+		if !ok {
+			logrus.Errorf("Error on running process: %s", err)
+			return -1, err
+		}
+		ps = exitErr.ProcessState
 	}
 	logrus.Errorf("process finished")
 	return utils.ExitStatus(ps.Sys().(syscall.WaitStatus)), nil
